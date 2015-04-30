@@ -39,7 +39,7 @@ class Tones {
 		
 		context = untyped __js__('new (window.AudioContext || window.webkitAudioContext)()');
 		type = OscillatorType.SINE;
-		attack = 1.0;
+		attack = 10.0;
 		release = 100.0;
 		volume = .125;
 		polyphony = 0;
@@ -55,18 +55,25 @@ class Tones {
 	 * notes.playFrequency(440); // plays a 440 Hz tone
 	 *
 	 * @param	freq
-	 * @return 	ID - note id
+	 * @param	autoRelease - release as soon as attack phase ends - default behaviour (true)
+	 * 						- when false the note will play until releaseNote(noteId) is called 
+	 * @return 	noteId
 	 */
-    public function playFrequency(freq:Float):Int {
+    public function playFrequency(freq:Float, autoRelease:Bool=true):Int {
 	   
+		var id = ID;
+		ID++;
+		
+		var attackSeconds = attack / 1000;
+		
 		var nowTime = now();
 		var envelope = context.createGain();
-		var releaseTime = nowTime + (attack / 1000);
+		var releaseTime = nowTime + attackSeconds;
 		
 		envelope.gain.value = 0;
 		envelope.connect(context.destination, 0);
 		
-		envelope.gain.setTargetAtTime(volume, nowTime, getTimeConstant(attack / 1000) );
+		envelope.gain.setTargetAtTime(volume, nowTime, getTimeConstant(attackSeconds) );
 		envelope.gain.setValueAtTime(volume, releaseTime);
 		
 		var osc = context.createOscillator();
@@ -75,17 +82,30 @@ class Tones {
 		osc.connect(envelope, 0);
 		osc.start(nowTime);
 		
-		activeNotes.set(ID, {id:ID, osc:osc, env:envelope} );
-	
-		//if (release > 0) { // todo: allow setting release later... hold notes
-			envelope.gain.setTargetAtTime(0, releaseTime, getTimeConstant(release / 1000));
-			Timer.delay(afterRelease.bind(ID), Math.round(attack + release));
-		//}
-		
+		activeNotes.set(id, { id:id, osc:osc, env:envelope, release:release, attackEnd:nowTime + attackSeconds } );
 		polyphony++;
 		
-		trace('on polyphony:$polyphony, id:$ID');
-		return ++ID;		
+		if (autoRelease) {
+			envelope.gain.setTargetAtTime(0, releaseTime, getTimeConstant(release / 1000));
+			Timer.delay(afterRelease.bind(id), Math.round(attack + release));
+		}
+		
+		trace('on polyphony:$polyphony, noteId:$id');
+		return id;		
+	}
+	
+	
+	public function releaseNote(id:Int) {
+		var note = getNote(id);
+		if (note == null) return;
+		
+		trace('releaseNote attackEnd:${note.attackEnd}, now:${now()})');
+		
+		// attack phase has not completed, cancel it
+		if (note.attackEnd > now()) note.env.gain.cancelScheduledValues(now());
+		
+		note.env.gain.setTargetAtTime(0, now(), getTimeConstant(note.release / 1000));
+		Timer.delay(afterRelease.bind(id), Math.round(note.release));
 	}
 	
 	
@@ -166,6 +186,8 @@ typedef Note = {
 	var id:Int;
 	var osc:OscillatorNode;
 	var env:GainNode;
+	var attackEnd:Float;
+	var release:Float;
 }
 
 typedef PlayData = {

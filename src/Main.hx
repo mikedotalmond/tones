@@ -18,24 +18,33 @@ class Main {
 	var tones			:Tones;
 	var keyboardNotes	:KeyboardNotes;
 	var keyboardInput	:KeyboardInput;
+	var activeKeys		:Array<Bool>;
+	
+	// For active notes - map note-index (0-128) to the Tones Note ID
+	var noteIndexToId	:Map<Int,Int>;
 	
 	public function new() {
 		
 		tones 			= new Tones();
 		keyboardNotes 	= new KeyboardNotes(2);
 		keyboardInput 	= new KeyboardInput(keyboardNotes);
+		noteIndexToId	= new Map<Int,Int>();
+		
+		activeKeys 		= new Array<Bool>();
+		for (i in 0...256) activeKeys[i] = false;
+
 		var noteFreq 	= keyboardNotes.noteFreq;
-		
 		tones.type 		= Tones.OscillatorType.SAWTOOTH;
-		// some tests
-		
+	
+		// some tests		
 		/*
+		tones.playFrequency(380);
 		tones.playFrequency(noteFreq.noteIndexToFrequency(noteFreq.noteNameToIndex('A3')));
 		
 		tones.play({
 			freq	:280,
 			volume	:.1, 
-			attack	:100, 
+			attack	:250, 
 			release	:250, 
 			type	:Tones.OscillatorType.SAWTOOTH,
 		});
@@ -52,10 +61,16 @@ class Main {
 		
 		// keyboard control...
 		Browser.window.addEventListener('keydown', function(e:KeyboardEvent) {
-			keyboardInput.onQwertyKeyDown(e.keyCode);
+			if (!activeKeys[e.keyCode]) {
+				activeKeys[e.keyCode] = true;
+				keyboardInput.onQwertyKeyDown(e.keyCode);
+			}
 		});
 		Browser.window.addEventListener('keyup', function(e:KeyboardEvent) {
-			keyboardInput.onQwertyKeyUp(e.keyCode);
+			if (activeKeys[e.keyCode]) {
+				activeKeys[e.keyCode] = false;
+				keyboardInput.onQwertyKeyUp(e.keyCode);
+			}
 		});
 		
 		keyboardInput.noteOn.connect(function(index:Int, volume:Float) {
@@ -63,10 +78,15 @@ class Main {
 			tones.volume  = .1;
 			tones.attack  = 250;
 			tones.release = 1000;
-			tones.playFrequency(f);
+			noteIndexToId.set(index, tones.playFrequency(f, false));
 		});
+		
 		keyboardInput.noteOff.connect(function(index:Int) {
-			// todo
+			tones.releaseNote(noteIndexToId.get(index));
+			noteIndexToId.remove(index);
 		});
-	}	
+	}
+	
+	inline public function keyIsDown(code:Int):Bool return activeKeys[code];
+
 }

@@ -2,6 +2,7 @@ package;
 import haxe.Timer;
 import js.Browser;
 import js.html.audio.AudioContext;
+import js.html.audio.AudioNode;
 import js.html.audio.GainNode;
 import js.html.audio.OscillatorNode;
 
@@ -13,8 +14,6 @@ import js.html.audio.OscillatorNode;
 
 class Tones {
   
-	static var ID:Int = 0;
-	
 	static inline var TimeConstDivider = 4.605170185988092; // Math.log(100);
 	static inline function getTimeConstant(time:Float) return Math.log(time + 1.0) / TimeConstDivider;
 	static inline function rExp(v) return 1.0 - 1.0 / Math.exp(v);
@@ -24,43 +23,47 @@ class Tones {
 	}
 	
 	
+	public var context(default, null):AudioContext;
+	public var destination(default, null):AudioNode;
+	
 	public var activeNotes(default, null):Map<Int, Note>;
 	
-	public var context(default, null):AudioContext;
-	public var type(default, default):OscillatorType;
-	
+	public var type:OscillatorType;
 	public var attack(get, set):Float;
 	public var release(get, set):Float;
 	public var volume(get, set):Float;
 	
 	public var polyphony(default, null):Int;
 	
+	var ID		:Int = 0;
 	var _attack	:Float;
 	var _release:Float;
 	var _volume	:Float;
 	
 	/**
-	 * @param	audioContext - optional. Leave empty and a new an AudioContext here to share will be created.
-	 * 			Pass an existing AudioContext instance to share it.
+	 * @param	audioContext 	- optional. Pass an exsiting audioContext here to share it.
+	 * @param	destinationNode - optional. Pass a custom destination AudioNode to connect to.
 	 */
-	public function new(audioContext:AudioContext = null) {
+	public function new(audioContext:AudioContext = null, ?destinationNode:AudioNode = null) {
 		
 		if (audioContext == null) {
 			context = Tones.createContext();
+			context.createGain(); // start-up (need to create a node in order to kick off the timer in Chrome)
 		} else {
 			context = audioContext;
 		}
 		
-		type = OscillatorType.SINE;
-		attack = 10.0;
-		release = 100.0;
-		volume = .1;
+		if (destinationNode == null) destination = context.destination;
+		else destination = destinationNode;
 		
 		polyphony = 0;
 		activeNotes = new Map<Int, Note>();
 		
-		// need to create a node in order to kick off the timer in Chrome.
-		context.createGain();
+		// set some reasonable defaults
+		type 	= OscillatorType.SINE;
+		attack 	= 5.0;
+		release = 100.0;
+		volume 	= .1;
 	}
 	
 	
@@ -86,7 +89,7 @@ class Tones {
 		var releaseTime = nowTime + attackSeconds;
 		
 		envelope.gain.value = 0;
-		envelope.connect(context.destination, 0);
+		envelope.connect(destination, 0);
 		
 		envelope.gain.setTargetAtTime(volume, nowTime, getTimeConstant(attackSeconds) );
 		envelope.gain.setValueAtTime(volume, releaseTime);

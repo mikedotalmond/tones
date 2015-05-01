@@ -1,5 +1,6 @@
 package;
 
+import haxe.Timer;
 import js.Browser;
 import js.html.KeyboardEvent;
 
@@ -16,40 +17,45 @@ class Main {
 	static function main() var m = new Main();
 	
 	var tones			:Tones;
+	
 	var keyboardNotes	:KeyboardNotes;
 	var keyboardInput	:KeyboardInput;
 	var activeKeys		:Array<Bool>;
-	
 	// For active notes - map note-index (0-128) to the Tones Note ID
 	var noteIndexToId	:Map<Int,Int>;
 	
 	public function new() {
 		
-		tones 			= new Tones();
+		tones = new Tones();
+		tones.playFrequency(440); // play a 440Hz tone with the default settings.
 		
-		keyboardNotes 	= new KeyboardNotes(2);
-		keyboardInput 	= new KeyboardInput(keyboardNotes);
-		noteIndexToId	= new Map<Int,Int>();
+		// Tones.createContext() can also be used to create a new AudioContext
 		
-		activeKeys 		= new Array<Bool>();
-		for (i in 0...256) activeKeys[i] = false;
-
-		tones.type 		= Tones.OscillatorType.SAWTOOTH;
-		//todo: stackoverflow.com/questions/20156888/what-are-the-parameters-for-createperiodicwave-in-google-chrome
-		// http://www.sitepoint.com/using-fourier-transforms-web-audio-api/
-		// https://chromium.googlecode.com/svn/trunk/samples/audio/wave-tables/
+		// You can also have multiple instances with a common AudioContext,
+		// and if you want,  set a custom output node rather than routing straight to the context.destination
 		
-		// keyboard control...
-		Browser.window.addEventListener('keydown', onKeyDown);https:
-		Browser.window.addEventListener('keyup', onKeyUp);
+		var context = tones.context; // get the AudioContext to share...
+		var masterVolume = context.createGain(); // create a gain node to act as master volume
+		masterVolume.gain.value = .5;
+		masterVolume.connect(context.destination); // connect the volume control to the context's destintion
 		
-		keyboardInput.noteOn.connect(handleNoteOn);
-		keyboardInput.noteOff.connect(handleNoteOff); 
+		// Create another tones instance and pass it an existing context and alternate destination node
+		var tones2 = new Tones(context, masterVolume);
+		
+		tones2.volume = .1;
+		tones2.type = Tones.OscillatorType.TRIANGLE;
+		tones2.playFrequency(220);
+		
+		setupKeyboardControls();	
 		
 		// some non-keyboard playback tests		
-		/*
+		///*
 		tones.playFrequency(380);
-		tones.playFrequency(keyboardNotes.noteFreq.noteIndexToFrequency(noteFreq.noteNameToIndex('A3')));
+		
+		tones.volume = .05;
+		tones.attack = 500;
+		
+		tones.playFrequency(keyboardNotes.noteFreq.noteIndexToFrequency(keyboardNotes.noteFreq.noteNameToIndex('A3')));
 		
 		tones.play({
 			freq	:280,
@@ -59,15 +65,40 @@ class Main {
 			type	:Tones.OscillatorType.SAWTOOTH,
 		});
 		
-		tones.play({ 
-			freq	:440,
-			volume	:.05, 
-			attack	:1000, 
-			release	:250, 
-			type	:Tones.OscillatorType.SQUARE,
-		});
+		// A sustained note - pass autoRelease false, then call releaseNote later - passing in the id 
+		tones2.attack = 20;
+		tones2.type = Tones.OscillatorType.SQUARE;
+		var noteId = tones2.playFrequency(440, false);
+		Timer.delay(tones2.releaseNote.bind(noteId), 1000);
 		//*/
 	}
+	
+	
+	
+	// ------------------------------------------------------------------------------------------------------
+	
+	
+	function setupKeyboardControls():Void {
+		
+		keyboardNotes 	= new KeyboardNotes(2);
+		keyboardInput 	= new KeyboardInput(keyboardNotes);
+		noteIndexToId	= new Map<Int,Int>();
+		activeKeys 		= new Array<Bool>();
+		for (i in 0...256) activeKeys[i] = false;
+	
+		tones.type 		= Tones.OscillatorType.SAWTOOTH;
+		//todo: stackoverflow.com/questions/20156888/what-are-the-parameters-for-createperiodicwave-in-google-chrome
+		// http://www.sitepoint.com/using-fourier-transforms-web-audio-api/
+		// https://chromium.googlecode.com/svn/trunk/samples/audio/wave-tables/
+		
+		// keyboard control...
+		Browser.window.addEventListener('keydown', onKeyDown);
+		Browser.window.addEventListener('keyup', onKeyUp);
+		
+		keyboardInput.noteOn.connect(handleNoteOn);
+		keyboardInput.noteOff.connect(handleNoteOff);
+	}
+	
 	
 	function onKeyDown(e:KeyboardEvent) {
 		if (!keyIsDown(e.keyCode)) {
@@ -84,7 +115,7 @@ class Main {
 	}
 	
 	function handleNoteOn(index:Int, volume:Float) {
-		var f = keyboardNotes.noteFreq.noteIndexToFrequency(index);
+		var f = keyboardNotes.noteIndexToFrequency(index);
 		tones.volume  = volume;
 		tones.attack  = 250;
 		tones.release = 1000;

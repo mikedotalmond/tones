@@ -16,7 +16,7 @@ class KeyboardNotes {
 	public var noteFreq(default, null):NoteFrequencyUtil;
 	public var keycodeToNoteFreq(default, null):Map<Int,Float>;
 	public var keycodeToNoteIndex(default, null):Map<Int,Int>;
-		
+	
 	public function new(startOctave:Int = 0) {
 		
 		this.startOctave	= startOctave;
@@ -58,39 +58,42 @@ class KeyboardNotes {
 		keycodeToNoteIndex.set(KeyCodes.EQUALS, noteFreq.noteNameToIndex('F#${startOctave+2}'));
 		keycodeToNoteIndex.set(KeyCodes.RIGHT_BRACKET, noteFreq.noteNameToIndex('G${startOctave+2}'));
 		
-		keycodeToNoteFreq.set(KeyCodes.Z, keycodeToNoteIndex.get(KeyCodes.Z));
-		keycodeToNoteFreq.set(KeyCodes.S, keycodeToNoteIndex.get(KeyCodes.S));
-		keycodeToNoteFreq.set(KeyCodes.X, keycodeToNoteIndex.get(KeyCodes.X));
-		keycodeToNoteFreq.set(KeyCodes.D, keycodeToNoteIndex.get(KeyCodes.D));
-		keycodeToNoteFreq.set(KeyCodes.C, keycodeToNoteIndex.get(KeyCodes.C));
-		keycodeToNoteFreq.set(KeyCodes.V, keycodeToNoteIndex.get(KeyCodes.V));
-		keycodeToNoteFreq.set(KeyCodes.G, keycodeToNoteIndex.get(KeyCodes.G));
-		keycodeToNoteFreq.set(KeyCodes.B, keycodeToNoteIndex.get(KeyCodes.B));
-		keycodeToNoteFreq.set(KeyCodes.H, keycodeToNoteIndex.get(KeyCodes.H));
-		keycodeToNoteFreq.set(KeyCodes.N, keycodeToNoteIndex.get(KeyCodes.N));
-		keycodeToNoteFreq.set(KeyCodes.J, keycodeToNoteIndex.get(KeyCodes.J));
-		keycodeToNoteFreq.set(KeyCodes.M, keycodeToNoteIndex.get(KeyCodes.M));
-		keycodeToNoteFreq.set(KeyCodes.Q, keycodeToNoteIndex.get(KeyCodes.Q));
-		keycodeToNoteFreq.set(KeyCodes.NUMBER_2, keycodeToNoteIndex.get(KeyCodes.NUMBER_2));
-		keycodeToNoteFreq.set(KeyCodes.W, keycodeToNoteIndex.get(KeyCodes.W));
-		keycodeToNoteFreq.set(KeyCodes.NUMBER_3, keycodeToNoteIndex.get(KeyCodes.NUMBER_3));
-		keycodeToNoteFreq.set(KeyCodes.E, keycodeToNoteIndex.get(KeyCodes.E));
-		keycodeToNoteFreq.set(KeyCodes.R, keycodeToNoteIndex.get(KeyCodes.R));
-		keycodeToNoteFreq.set(KeyCodes.NUMBER_5, keycodeToNoteIndex.get(KeyCodes.NUMBER_5));
-		keycodeToNoteFreq.set(KeyCodes.T, keycodeToNoteIndex.get(KeyCodes.T));
-		keycodeToNoteFreq.set(KeyCodes.NUMBER_6, keycodeToNoteIndex.get(KeyCodes.NUMBER_6));
-		keycodeToNoteFreq.set(KeyCodes.Y, keycodeToNoteIndex.get(KeyCodes.Y));
-		keycodeToNoteFreq.set(KeyCodes.NUMBER_7, keycodeToNoteIndex.get(KeyCodes.NUMBER_7));
-		keycodeToNoteFreq.set(KeyCodes.U, keycodeToNoteIndex.get(KeyCodes.U));
-		keycodeToNoteFreq.set(KeyCodes.I, keycodeToNoteIndex.get(KeyCodes.I));
-		keycodeToNoteFreq.set(KeyCodes.NUMBER_9, keycodeToNoteIndex.get(KeyCodes.NUMBER_9));
-		keycodeToNoteFreq.set(KeyCodes.O, keycodeToNoteIndex.get(KeyCodes.O));
-		keycodeToNoteFreq.set(KeyCodes.NUMBER_0, keycodeToNoteIndex.get(KeyCodes.NUMBER_0));
-		keycodeToNoteFreq.set(KeyCodes.P, keycodeToNoteIndex.get(KeyCodes.P));
-		keycodeToNoteFreq.set(KeyCodes.LEFT_BRACKET, keycodeToNoteIndex.get(KeyCodes.LEFT_BRACKET));
-		keycodeToNoteFreq.set(KeyCodes.EQUALS, keycodeToNoteIndex.get(KeyCodes.EQUALS));
-		keycodeToNoteFreq.set(KeyCodes.RIGHT_BRACKET, keycodeToNoteIndex.get(KeyCodes.RIGHT_BRACKET));
+		keycodeToNoteFreq.set(KeyCodes.Z, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.Z)));
+		keycodeToNoteFreq.set(KeyCodes.S, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.S)));
+		keycodeToNoteFreq.set(KeyCodes.X, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.X)));
+		keycodeToNoteFreq.set(KeyCodes.D, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.D)));
+		keycodeToNoteFreq.set(KeyCodes.C, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.C)));
+		keycodeToNoteFreq.set(KeyCodes.V, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.V)));
+		keycodeToNoteFreq.set(KeyCodes.G, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.G)));
+		keycodeToNoteFreq.set(KeyCodes.B, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.B)));
+		keycodeToNoteFreq.set(KeyCodes.H, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.H)));
+		keycodeToNoteFreq.set(KeyCodes.N, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.N)));
+		keycodeToNoteFreq.set(KeyCodes.J, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.J)));
+		keycodeToNoteFreq.set(KeyCodes.M, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.M)));
+		keycodeToNoteFreq.set(KeyCodes.Q, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.Q)));
+		keycodeToNoteFreq.set(KeyCodes.NUMBER_2, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.NUMBER_2)));
+		keycodeToNoteFreq.set(KeyCodes.W, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.W)));
+		keycodeToNoteFreq.set(KeyCodes.NUMBER_3, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.NUMBER_3)));
+		keycodeToNoteFreq.set(KeyCodes.E, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.E)));
+		keycodeToNoteFreq.set(KeyCodes.R, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.R)));
+		keycodeToNoteFreq.set(KeyCodes.NUMBER_5, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.NUMBER_5)));
+		keycodeToNoteFreq.set(KeyCodes.T, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.T)));
+		keycodeToNoteFreq.set(KeyCodes.NUMBER_6, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.NUMBER_6)));
+		keycodeToNoteFreq.set(KeyCodes.Y, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.Y)));
+		keycodeToNoteFreq.set(KeyCodes.NUMBER_7, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.NUMBER_7)));
+		keycodeToNoteFreq.set(KeyCodes.U, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.U)));
+		keycodeToNoteFreq.set(KeyCodes.I, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.I)));
+		keycodeToNoteFreq.set(KeyCodes.NUMBER_9, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.NUMBER_9)));
+		keycodeToNoteFreq.set(KeyCodes.O, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.O)));
+		keycodeToNoteFreq.set(KeyCodes.NUMBER_0, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.NUMBER_0)));
+		keycodeToNoteFreq.set(KeyCodes.P, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.P)));
+		keycodeToNoteFreq.set(KeyCodes.LEFT_BRACKET, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.LEFT_BRACKET)));
+		keycodeToNoteFreq.set(KeyCodes.EQUALS, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.EQUALS)));
+		keycodeToNoteFreq.set(KeyCodes.RIGHT_BRACKET, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.RIGHT_BRACKET)));
 	}
+	
+	inline public function noteIndexToFrequency(index:Int):Float return noteFreq.noteIndexToFrequency(index);
+	inline public function noteIndexToFrequencyWithDetune(index:Int, cents:Int):Float return noteFreq.noteIndexToFrequencyWithDetune(index, cents);
 	
 	public function dispose() {
 		noteFreq 			= null;

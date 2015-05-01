@@ -19,6 +19,10 @@ class Tones {
 	static inline function getTimeConstant(time:Float) return Math.log(time + 1.0) / TimeConstDivider;
 	static inline function rExp(v) return 1.0 - 1.0 / Math.exp(v);
 	
+	public static function createContext():AudioContext {
+		return untyped __js__('new (window.AudioContext || window.webkitAudioContext)()');
+	}
+	
 	
 	public var activeNotes(default, null):Map<Int, Note>;
 	
@@ -35,13 +39,23 @@ class Tones {
 	var _release:Float;
 	var _volume	:Float;
 	
-	public function new() {
+	/**
+	 * @param	audioContext - optional. Leave empty and a new an AudioContext here to share will be created.
+	 * 			Pass an existing AudioContext instance to share it.
+	 */
+	public function new(audioContext:AudioContext = null) {
 		
-		context = untyped __js__('new (window.AudioContext || window.webkitAudioContext)()');
+		if (audioContext == null) {
+			context = Tones.createContext();
+		} else {
+			context = audioContext;
+		}
+		
 		type = OscillatorType.SINE;
 		attack = 10.0;
 		release = 100.0;
-		volume = .125;
+		volume = .1;
+		
 		polyphony = 0;
 		activeNotes = new Map<Int, Note>();
 		
@@ -56,7 +70,8 @@ class Tones {
 	 *
 	 * @param	freq
 	 * @param	autoRelease - release as soon as attack phase ends - default behaviour (true)
-	 * 						- when false the note will play until releaseNote(noteId) is called 
+	 * 						- when false the note will play until releaseNote(noteId) is called
+	 * 						- Don't use these behaviours at the same time in one Tones instance 
 	 * @return 	noteId
 	 */
     public function playFrequency(freq:Float, autoRelease:Bool=true):Int {

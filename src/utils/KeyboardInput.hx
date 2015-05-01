@@ -57,9 +57,7 @@ class KeyboardInput {
 		}
 	}
 	
-	//TODO: add note velocity optional...
-	
-	public function onNoteKeyDown(noteIndex:Int, ?velocity:Float=1.0) {
+	public function onNoteKeyDown(noteIndex:Int, ?velocity:Float=.1) {
 		var i = Lambda.indexOf(heldNotes, noteIndex);
 		if (i == -1) { // not already down?
 			heldNotes.push(noteIndex);

@@ -26,6 +26,7 @@ class Main {
 	public function new() {
 		
 		tones 			= new Tones();
+		
 		keyboardNotes 	= new KeyboardNotes(2);
 		keyboardInput 	= new KeyboardInput(keyboardNotes);
 		noteIndexToId	= new Map<Int,Int>();
@@ -33,13 +34,22 @@ class Main {
 		activeKeys 		= new Array<Bool>();
 		for (i in 0...256) activeKeys[i] = false;
 
-		var noteFreq 	= keyboardNotes.noteFreq;
 		tones.type 		= Tones.OscillatorType.SAWTOOTH;
-	
-		// some tests		
+		//todo: stackoverflow.com/questions/20156888/what-are-the-parameters-for-createperiodicwave-in-google-chrome
+		// http://www.sitepoint.com/using-fourier-transforms-web-audio-api/
+		// https://chromium.googlecode.com/svn/trunk/samples/audio/wave-tables/
+		
+		// keyboard control...
+		Browser.window.addEventListener('keydown', onKeyDown);https:
+		Browser.window.addEventListener('keyup', onKeyUp);
+		
+		keyboardInput.noteOn.connect(handleNoteOn);
+		keyboardInput.noteOff.connect(handleNoteOff); 
+		
+		// some non-keyboard playback tests		
 		/*
 		tones.playFrequency(380);
-		tones.playFrequency(noteFreq.noteIndexToFrequency(noteFreq.noteNameToIndex('A3')));
+		tones.playFrequency(keyboardNotes.noteFreq.noteIndexToFrequency(noteFreq.noteNameToIndex('A3')));
 		
 		tones.play({
 			freq	:280,
@@ -57,34 +67,33 @@ class Main {
 			type	:Tones.OscillatorType.SQUARE,
 		});
 		//*/
-		
-		
-		// keyboard control...
-		Browser.window.addEventListener('keydown', function(e:KeyboardEvent) {
-			if (!activeKeys[e.keyCode]) {
-				activeKeys[e.keyCode] = true;
-				keyboardInput.onQwertyKeyDown(e.keyCode);
-			}
-		});
-		Browser.window.addEventListener('keyup', function(e:KeyboardEvent) {
-			if (activeKeys[e.keyCode]) {
-				activeKeys[e.keyCode] = false;
-				keyboardInput.onQwertyKeyUp(e.keyCode);
-			}
-		});
-		
-		keyboardInput.noteOn.connect(function(index:Int, volume:Float) {
-			var f = noteFreq.noteIndexToFrequency(index);
-			tones.volume  = .1;
-			tones.attack  = 250;
-			tones.release = 1000;
-			noteIndexToId.set(index, tones.playFrequency(f, false));
-		});
-		
-		keyboardInput.noteOff.connect(function(index:Int) {
-			tones.releaseNote(noteIndexToId.get(index));
-			noteIndexToId.remove(index);
-		});
+	}
+	
+	function onKeyDown(e:KeyboardEvent) {
+		if (!keyIsDown(e.keyCode)) {
+			activeKeys[e.keyCode] = true;
+			keyboardInput.onQwertyKeyDown(e.keyCode);
+		}
+	}
+	
+	function onKeyUp(e:KeyboardEvent) {
+		if (keyIsDown(e.keyCode)) {
+			activeKeys[e.keyCode] = false;
+			keyboardInput.onQwertyKeyUp(e.keyCode);
+		}
+	}
+	
+	function handleNoteOn(index:Int, volume:Float) {
+		var f = keyboardNotes.noteFreq.noteIndexToFrequency(index);
+		tones.volume  = volume;
+		tones.attack  = 250;
+		tones.release = 1000;
+		noteIndexToId.set(index, tones.playFrequency(f, false));
+	}
+	
+	function handleNoteOff(index:Int) {
+		tones.releaseNote(noteIndexToId.get(index));
+		noteIndexToId.remove(index);
 	}
 	
 	inline public function keyIsDown(code:Int):Bool return activeKeys[code];

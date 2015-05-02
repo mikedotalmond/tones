@@ -29,6 +29,8 @@ class Main {
 		tones = new Tones();
 		tones.playFrequency(440); // play a 440Hz tone with the default settings.
 		
+		setupKeyboardControls();	
+		
 		// Tones.createContext() can also be used to create a new AudioContext
 		
 		// You can also have multiple instances with a common AudioContext,
@@ -45,8 +47,6 @@ class Main {
 		tones2.volume = .1;
 		tones2.type = Tones.OscillatorType.TRIANGLE;
 		tones2.playFrequency(220);
-		
-		setupKeyboardControls();	
 		
 		// some non-keyboard playback tests		
 		///*
@@ -87,7 +87,7 @@ class Main {
 		for (i in 0...256) activeKeys[i] = false;
 	
 		tones.type 		= Tones.OscillatorType.SAWTOOTH;
-		//todo: stackoverflow.com/questions/20156888/what-are-the-parameters-for-createperiodicwave-in-google-chrome
+		// todo: stackoverflow.com/questions/20156888/what-are-the-parameters-for-createperiodicwave-in-google-chrome
 		// http://www.sitepoint.com/using-fourier-transforms-web-audio-api/
 		// https://chromium.googlecode.com/svn/trunk/samples/audio/wave-tables/
 		
@@ -117,8 +117,8 @@ class Main {
 	function handleNoteOn(index:Int, volume:Float) {
 		var f = keyboardNotes.noteIndexToFrequency(index);
 		tones.volume  = volume;
-		tones.attack  = 250;
-		tones.release = 1000;
+		tones.attack  = 150;
+		tones.release = 750;
 		noteIndexToId.set(index, tones.playFrequency(f, false));
 	}
 	

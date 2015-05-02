@@ -22,6 +22,8 @@ class Tones {
 		return untyped __js__('new (window.AudioContext || window.webkitAudioContext)()');
 	}
 	
+	public static inline function isFirefox() return Browser.navigator.userAgent.indexOf('Firefox') > -1;
+	
 	
 	public var context(default, null):AudioContext;
 	public var destination(default, null):AudioNode;
@@ -35,10 +37,11 @@ class Tones {
 	
 	public var polyphony(default, null):Int;
 	
-	var ID		:Int = 0;
-	var _attack	:Float;
+	var ID:Int = 0;
+	var _attack:Float;
 	var _release:Float;
-	var _volume	:Float;
+	var _volume:Float;
+	var releaseFudge:Float;
 	
 	/**
 	 * @param	audioContext 	- optional. Pass an exsiting audioContext here to share it.
@@ -48,7 +51,6 @@ class Tones {
 		
 		if (audioContext == null) {
 			context = Tones.createContext();
-			context.createGain(); // start-up (need to create a node in order to kick off the timer in Chrome)
 		} else {
 			context = audioContext;
 		}
@@ -59,6 +61,12 @@ class Tones {
 		polyphony = 0;
 		activeNotes = new Map<Int, Note>();
 		
+		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work...
+		// If I use context.currentTime and setTargetAtTime will not fade, it just ends aruptly. 
+		// Even with this delay it's a bit glitchy occasionally
+		// Works fine in Chrome 
+		releaseFudge = isFirefox() ? (4096 / context.sampleRate) : 0;
+	
 		// set some reasonable defaults
 		type 	= OscillatorType.SINE;
 		attack 	= 5.0;
@@ -90,9 +98,8 @@ class Tones {
 		
 		envelope.gain.value = 0;
 		envelope.connect(destination, 0);
-		
-		envelope.gain.setTargetAtTime(volume, nowTime, getTimeConstant(attackSeconds) );
-		envelope.gain.setValueAtTime(volume, releaseTime);
+		// attack
+		envelope.gain.setTargetAtTime(volume, nowTime, getTimeConstant(attackSeconds));
 		
 		var osc = context.createOscillator();
 		osc.frequency.setValueAtTime(freq, nowTime);
@@ -108,7 +115,7 @@ class Tones {
 			Timer.delay(afterRelease.bind(id), Math.round(attack + release));
 		}
 		
-		trace('on polyphony:$polyphony, noteId:$id');
+		trace('On  | Polyphony:$polyphony, noteId:$id, freq:$freq');
 		return id;		
 	}
 	
@@ -117,13 +124,14 @@ class Tones {
 		var note = getNote(id);
 		if (note == null) return;
 		
-		trace('releaseNote attackEnd:${note.attackEnd}, now:${now()})');
+		var t = now() + releaseFudge;
+		var r = note.release;
 		
 		// attack phase has not completed, cancel it
-		if (note.attackEnd > now()) note.env.gain.cancelScheduledValues(now());
+		if (note.attackEnd > now()) note.env.gain.cancelScheduledValues(t);
 		
-		note.env.gain.setTargetAtTime(0, now(), getTimeConstant(note.release / 1000));
-		Timer.delay(afterRelease.bind(id), Math.round(note.release));
+		note.env.gain.setTargetAtTime(0, t, getTimeConstant(r / 1000));
+		Timer.delay(afterRelease.bind(id), Math.round(r));
 	}
 	
 	
@@ -163,17 +171,18 @@ class Tones {
 	 */
 	function afterRelease(id:Int) {
 		var note = activeNotes.get(id);
+		if (note == null) return;
 		
 		note.osc.stop(now());
 		note.osc.disconnect(0);
+		
 		note.env.gain.cancelScheduledValues(now());
 		note.env.disconnect(0);
 		
 		activeNotes.remove(id);
-		
 		polyphony--;
 		
-		trace('off polyphony:$polyphony, id:$id');
+		trace('Off | Polyphony:$polyphony, noteId:$id');
 	}
 
 	

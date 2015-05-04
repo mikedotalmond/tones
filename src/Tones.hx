@@ -5,6 +5,7 @@ import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
 import js.html.audio.GainNode;
 import js.html.audio.OscillatorNode;
+import js.html.audio.WaveTable;
 
 /**
  * ...
@@ -24,13 +25,13 @@ class Tones {
 	
 	public static inline function isFirefox() return Browser.navigator.userAgent.indexOf('Firefox') > -1;
 	
-	
 	public var context(default, null):AudioContext;
 	public var destination(default, null):AudioNode;
 	
 	public var activeNotes(default, null):Map<Int, Note>;
 	
-	public var type:OscillatorType;
+	public var type:OscillatorType;	
+	public var customWave:WaveTable = null;
 	public var attack(get, set):Float;
 	public var release(get, set):Float;
 	public var volume(get, set):Float;
@@ -69,6 +70,7 @@ class Tones {
 	
 		// set some reasonable defaults
 		type 	= OscillatorType.SINE;
+		
 		attack 	= 5.0;
 		release = 100.0;
 		volume 	= .1;
@@ -102,8 +104,10 @@ class Tones {
 		envelope.gain.setTargetAtTime(volume, nowTime, getTimeConstant(attackSeconds));
 		
 		var osc = context.createOscillator();
-		osc.frequency.setValueAtTime(freq, nowTime);
+		if (type == OscillatorType.CUSTOM) osc.setPeriodicWave(customWave);
 		osc.type = cast type;
+		
+		osc.frequency.setValueAtTime(freq, nowTime);
 		osc.connect(envelope, 0);
 		osc.start(nowTime);
 		
@@ -112,26 +116,11 @@ class Tones {
 		
 		if (autoRelease) {
 			envelope.gain.setTargetAtTime(0, releaseTime, getTimeConstant(release / 1000));
-			Timer.delay(afterRelease.bind(id), Math.round(attack + release));
+			Timer.delay(stop.bind(id), Math.round(attack + release));
 		}
 		
 		trace('On  | Polyphony:$polyphony, noteId:$id, freq:$freq');
 		return id;		
-	}
-	
-	
-	public function releaseNote(id:Int) {
-		var note = getNote(id);
-		if (note == null) return;
-		
-		var t = now() + releaseFudge;
-		var r = note.release;
-		
-		// attack phase has not completed, cancel it
-		if (note.attackEnd > now()) note.env.gain.cancelScheduledValues(t);
-		
-		note.env.gain.setTargetAtTime(0, t, getTimeConstant(r / 1000));
-		Timer.delay(afterRelease.bind(id), Math.round(r));
 	}
 	
 	
@@ -149,19 +138,29 @@ class Tones {
 	}
 	
 	
-	/**
-	 * 
-	 * @param	id
-	 * @return	Note
-	 */
-	inline public function getNote(id:Int):Note return activeNotes.get(id);
+	public function releaseNote(id:Int) {
+		var note = getNote(id);
+		if (note == null) return;
+		
+		var t = now() + releaseFudge;
+		var r = note.release;
+		
+		// attack phase has not completed, cancel it
+		if (note.attackEnd > now()) note.env.gain.cancelScheduledValues(t);
+		
+		note.env.gain.setTargetAtTime(0, t, getTimeConstant(r / 1000));
+		Timer.delay(stop.bind(id), Math.round(r));
+	}
 	
 	
-	/**
-	 * The current audio-context time
-	 * @return
-	 */
-	inline public function now():Float return context.currentTime;
+	public function releaseAll() {
+		for (id in activeNotes.keys()) releaseNote(id);
+	}
+	
+	
+	public function stopAll() {
+		for (id in activeNotes.keys()) stop(id);
+	}
 	
     
 	/**
@@ -169,7 +168,7 @@ class Tones {
 	 * @param	osc
 	 * @param	env
 	 */
-	function afterRelease(id:Int) {
+	public function stop(id:Int) {
 		var note = activeNotes.get(id);
 		if (note == null) return;
 		
@@ -185,6 +184,20 @@ class Tones {
 		trace('Off | Polyphony:$polyphony, noteId:$id');
 	}
 
+	/**
+	 * 
+	 * @param	id
+	 * @return	Note
+	 */
+	inline public function getNote(id:Int):Note return activeNotes.get(id);
+	
+	
+	/**
+	 * The current audio-context time
+	 * @return
+	 */
+	inline public function now():Float return context.currentTime;
+	
 	
 	// get / set
 	

@@ -1,8 +1,11 @@
 package;
 
+import haxe.Json;
 import haxe.Timer;
 import js.Browser;
+import js.html.Float32Array;
 import js.html.KeyboardEvent;
+import utils.Wavetables;
 
 import utils.KeyboardInput;
 import utils.KeyboardNotes;
@@ -11,7 +14,6 @@ import utils.KeyboardNotes;
  * ...
  * @author Mike Almond - https://github.com/mikedotalmond
  */
-
 class Main {
 	
 	static function main() var m = new Main();
@@ -26,10 +28,18 @@ class Main {
 	
 	public function new() {
 		
+		var w = new Wavetables();
+		
+		//var Waves = Wavetables.Waves;
+		//trace(Wavetables.FileNames);
+		
 		tones = new Tones();
 		tones.playFrequency(440); // play a 440Hz tone with the default settings.
 		
 		setupKeyboardControls();	
+		
+		//var wave = tones.context.createPeriodicWave(new Float32Array(Waves[3].real), new Float32Array(Waves[3].imag));
+		//tones.customWave = wave;
 		
 		// Tones.createContext() can also be used to create a new AudioContext
 		
@@ -66,10 +76,10 @@ class Main {
 		});
 		
 		// A sustained note - pass autoRelease false, then call releaseNote later - passing in the id 
-		tones2.attack = 20;
-		tones2.type = Tones.OscillatorType.SQUARE;
-		var noteId = tones2.playFrequency(440, false);
-		Timer.delay(tones2.releaseNote.bind(noteId), 1000);
+		tones.attack = 20;
+		tones.type = Tones.OscillatorType.SQUARE;
+		var noteId = tones.playFrequency(110, false);
+		Timer.delay(tones.releaseNote.bind(noteId), 1000);
 		//*/
 	}
 	
@@ -80,7 +90,7 @@ class Main {
 	
 	function setupKeyboardControls():Void {
 		
-		keyboardNotes 	= new KeyboardNotes(2);
+		keyboardNotes 	= new KeyboardNotes(1);
 		keyboardInput 	= new KeyboardInput(keyboardNotes);
 		noteIndexToId	= new Map<Int,Int>();
 		activeKeys 		= new Array<Bool>();
@@ -116,9 +126,10 @@ class Main {
 	
 	function handleNoteOn(index:Int, volume:Float) {
 		var f = keyboardNotes.noteIndexToFrequency(index);
-		tones.volume  = volume;
-		tones.attack  = 150;
-		tones.release = 750;
+		tones.volume   = .2;
+		//tones.type 		= Tones.OscillatorType.CUSTOM;
+		tones.attack  = 10;
+		tones.release = 1000;
 		noteIndexToId.set(index, tones.playFrequency(f, false));
 	}
 	

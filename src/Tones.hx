@@ -5,7 +5,7 @@ import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
 import js.html.audio.GainNode;
 import js.html.audio.OscillatorNode;
-import js.html.audio.WaveTable;
+import js.html.audio.PeriodicWave;
 
 /**
  * ...
@@ -18,12 +18,12 @@ class Tones {
 	static inline var TimeConstDivider = 4.605170185988092; // Math.log(100);
 	static inline function getTimeConstant(time:Float) return Math.log(time + 1.0) / TimeConstDivider;
 	static inline function rExp(v) return 1.0 - 1.0 / Math.exp(v);
+	static inline function isFirefox() return Browser.navigator.userAgent.indexOf('Firefox') > -1;
 	
 	public static function createContext():AudioContext {
 		return untyped __js__('new (window.AudioContext || window.webkitAudioContext)()');
 	}
 	
-	public static inline function isFirefox() return Browser.navigator.userAgent.indexOf('Firefox') > -1;
 	
 	public var context(default, null):AudioContext;
 	public var destination(default, null):AudioNode;
@@ -31,7 +31,7 @@ class Tones {
 	public var activeNotes(default, null):Map<Int, Note>;
 	
 	public var type:OscillatorType;	
-	public var customWave:WaveTable = null;
+	public var customWave:PeriodicWave = null;
 	public var attack(get, set):Float;
 	public var release(get, set):Float;
 	public var volume(get, set):Float;

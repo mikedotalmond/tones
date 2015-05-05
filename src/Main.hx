@@ -30,7 +30,7 @@ class Main {
 		
 		var w = new Wavetables();
 		
-		//var Waves = Wavetables.Waves;
+		//var waves = w.waves;
 		//trace(Wavetables.FileNames);
 		
 		tones = new Tones();
@@ -38,7 +38,7 @@ class Main {
 		
 		setupKeyboardControls();	
 		
-		//var wave = tones.context.createPeriodicWave(new Float32Array(Waves[3].real), new Float32Array(Waves[3].imag));
+		//var wave = tones.context.createPeriodicWave(new Float32Array(waves[3].real), new Float32Array(waves[3].imag));
 		//tones.customWave = wave;
 		
 		// Tones.createContext() can also be used to create a new AudioContext
@@ -97,9 +97,6 @@ class Main {
 		for (i in 0...256) activeKeys[i] = false;
 	
 		tones.type 		= Tones.OscillatorType.SAWTOOTH;
-		// todo: stackoverflow.com/questions/20156888/what-are-the-parameters-for-createperiodicwave-in-google-chrome
-		// http://www.sitepoint.com/using-fourier-transforms-web-audio-api/
-		// https://chromium.googlecode.com/svn/trunk/samples/audio/wave-tables/
 		
 		// keyboard control...
 		Browser.window.addEventListener('keydown', onKeyDown);

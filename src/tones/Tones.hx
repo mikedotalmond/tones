@@ -39,8 +39,9 @@ class Tones {
 	
 	public var type:OscillatorType;	
 	public var customWave:PeriodicWave = null;
-	public var attack(get, set):Float;
-	public var release(get, set):Float;
+	
+	public var attack(get, set):Float; // milliseconds
+	public var release(get, set):Float; // milliseconds
 	public var volume(get, set):Float;
 	
 	public var polyphony(default, null):Int;
@@ -69,16 +70,16 @@ class Tones {
 		polyphony = 0;
 		activeNotes = new Map<Int, Note>();
 		
-		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work (apparently about 4096 samples worth of data (1 buffer perhaps?))
-		// If I use context.currentTime and setTargetAtTime will not fade, it just ends aruptly. 
-		// Even with this delay it's a bit glitchy occasionally...
-		// Works fine in Chrome 
+		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
+		// (apparently about 4096 samples worth of data (1 buffer perhaps?))
+		// If I use context.currentTime the setTargetAtTime will not fade-out, it just ends aruptly.  
+		// Even with this delay in place it's still occasionaly glitchy...
+		// Works fine in Chrome
 		releaseFudge = isFirefox() ? (4096 / context.sampleRate) : 0;
-	
+		
 		// set some reasonable defaults
 		type 	= OscillatorType.SINE;
-		
-		attack 	= 5.0;
+		attack 	= 10.0;
 		release = 100.0;
 		volume 	= .1;
 	}
@@ -89,36 +90,38 @@ class Tones {
 	 * notes.playFrequency(440); // plays a 440 Hz tone
 	 *
 	 * @param	freq
-	 * @param	autoRelease - release as soon as attack phase ends - default behaviour (true)
-	 * 						- when false the note will play until releaseNote(noteId) is called
+	 * @param	delayBy		- A time, in seconds, to delay triggering this note by.
+	 * @param	autoRelease - Release as soon as attack phase ends - default behaviour (true)
+	 * 						  when false the note will play until releaseNote(noteId) is called
 	 * 						- Don't use these behaviours at the same time in one Tones instance 
 	 * @return 	noteId
 	 */
-    public function playFrequency(freq:Float, autoRelease:Bool=true):Int {
+    public function playFrequency(freq:Float, delayBy:Float = .0, autoRelease:Bool = true):Int {
 	   
-		var id = ID;
-		ID++;
+		var id = ID; ID++;
 		
 		var attackSeconds = attack / 1000;
 		
-		var nowTime = now();
 		var envelope = context.createGain();
-		var releaseTime = nowTime + attackSeconds;
+		var triggerTime = now() + delayBy;
+		var releaseTime = triggerTime + attackSeconds;
 		
 		envelope.gain.value = 0;
-		envelope.connect(destination, 0);
+		envelope.connect(destination);
 		// attack
-		envelope.gain.setTargetAtTime(volume, nowTime, getTimeConstant(attackSeconds));
+		envelope.gain.setTargetAtTime(volume, triggerTime, getTimeConstant(attackSeconds));
 		
 		var osc = context.createOscillator();
 		if (type == OscillatorType.CUSTOM) osc.setPeriodicWave(customWave);
-		osc.type = cast type;
+		else osc.type = cast type; // firefox throws InvalidStateError if setting osc type and using setPeriodicWave 
 		
-		osc.frequency.setValueAtTime(freq, nowTime);
-		osc.connect(envelope, 0);
-		osc.start(nowTime);
+		// set freq value before connecting
+		osc.frequency.value = freq;
 		
-		activeNotes.set(id, { id:id, osc:osc, env:envelope, release:release, attackEnd:nowTime + attackSeconds } );
+		osc.connect(envelope);
+		osc.start(triggerTime);
+		
+		activeNotes.set(id, { id:id, osc:osc, env:envelope, release:release, attackEnd:triggerTime + attackSeconds } );
 		polyphony++;
 		
 		if (autoRelease) {
@@ -126,7 +129,7 @@ class Tones {
 			Timer.delay(stop.bind(id), Math.round(attack + release));
 		}
 		
-		trace('On  | Polyphony:$polyphony, noteId:$id, freq:$freq');
+		trace('On  | Polyphony:$polyphony, noteId:$id, freq:$freq, delayBy:$delayBy');
 		return id;		
 	}
 	
@@ -141,10 +144,14 @@ class Tones {
 		attack 	= playData.attack;
 		release = playData.release;
 		type 	= playData.type;
-		return playFrequency(playData.freq);
+		return playFrequency(playData.freq, (playData.delay == null) ? 0 : playData.delay);
 	}
 	
 	
+	/**
+	 * 
+	 * @param	id
+	 */
 	public function releaseNote(id:Int) {
 		var note = getNote(id);
 		if (note == null) return;
@@ -180,10 +187,10 @@ class Tones {
 		if (note == null) return;
 		
 		note.osc.stop(now());
-		note.osc.disconnect(0);
+		note.osc.disconnect();
 		
 		note.env.gain.cancelScheduledValues(now());
-		note.env.disconnect(0);
+		note.env.disconnect();
 		
 		activeNotes.remove(id);
 		polyphony--;
@@ -238,9 +245,10 @@ typedef Note = {
 }
 
 typedef PlayData = {
-	var volume	:Float;
-	var attack	:Float;
-	var release	:Float;
-	var type	:OscillatorType;
-	var freq	:Float;
+	var volume:Float;
+	var attack:Float;
+	var release:Float;
+	var type:OscillatorType;
+	var freq:Float;
+	@:optional var delay:Float;
 }

@@ -1,11 +1,18 @@
-package;
+package tones;
+
 import haxe.Timer;
 import js.Browser;
+
 import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
 import js.html.audio.GainNode;
 import js.html.audio.OscillatorNode;
+
+#if (haxe_ver <= 3.103)
+typedef PeriodicWave = js.html.audio.WaveTable;
+#else
 import js.html.audio.PeriodicWave;
+#end
 
 /**
  * ...
@@ -62,9 +69,9 @@ class Tones {
 		polyphony = 0;
 		activeNotes = new Map<Int, Note>();
 		
-		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work...
+		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work (apparently about 4096 samples worth of data (1 buffer perhaps?))
 		// If I use context.currentTime and setTargetAtTime will not fade, it just ends aruptly. 
-		// Even with this delay it's a bit glitchy occasionally
+		// Even with this delay it's a bit glitchy occasionally...
 		// Works fine in Chrome 
 		releaseFudge = isFirefox() ? (4096 / context.sampleRate) : 0;
 	
@@ -236,29 +243,4 @@ typedef PlayData = {
 	var release	:Float;
 	var type	:OscillatorType;
 	var freq	:Float;
-}
-
-@:native("window.OscillatorTypeShim")
-extern enum OscillatorType {
-	SINE; 
-	SQUARE; 
-	TRIANGLE; 
-	SAWTOOTH; 
-	CUSTOM;
-}
-
-@:keep @:noCompletion class OscillatorTypeShim {	
-	static function __init__() {
-		// init shim -- fix for differences in current browser versions
-		var node:Dynamic = untyped __js__('window.OscillatorNode');
-		if (node != null) {
-			if (Reflect.hasField(node, "SINE")) {
-				// older chrome/webkit
-				untyped __js__('window.OscillatorTypeShim = {SINE:node.SINE, SQUARE:node.SQUARE, TRIANGLE:node.TRIANGLE, SAWTOOTH:node.SAWTOOTH, CUSTOM:node.CUSTOM}');
-			} else {
-				// firefox/geko
-				untyped __js__('window.OscillatorTypeShim = {SINE:"sine", SQUARE:"square", TRIANGLE:"triangle", SAWTOOTH:"sawtooth", CUSTOM:"custom"}');
-			}
-		}
-	}
 }

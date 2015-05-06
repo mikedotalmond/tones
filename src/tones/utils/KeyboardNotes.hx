@@ -1,4 +1,4 @@
-﻿package utils;
+﻿package tones.utils;
 
 /**
  * Map keys on a QWERTY keyboard to musical keyboard notes and frequencies
@@ -8,7 +8,7 @@
 
 import input.KeyCodes;
 import js.html.Float32Array;
-import utils.NoteFrequencyUtil;
+import tones.utils.NoteFrequencyUtil;
 
 class KeyboardNotes {
 	

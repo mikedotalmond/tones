@@ -1,4 +1,4 @@
-package utils;
+package tones.utils;
 
 /**
  * A Haxe port of Recorderjs - https://github.com/mattdiamond/Recorderjs
@@ -111,9 +111,8 @@ class AudioNodeRecorder {
 		click.initEvent("click", true, true);
 		link.dispatchEvent(click);
 	}
-	 
+	
 	static var GetBufferMessage		:Dynamic = { command: 'getBuffer' };
 	static var EncodeWAVMessage		:Dynamic = { command: 'exportWAV', type: 'audio/wav' };
 	static var ClearBufferMessage	:Dynamic = { command: 'clear' };
-  
 }

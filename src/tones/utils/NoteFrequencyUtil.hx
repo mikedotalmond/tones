@@ -1,4 +1,4 @@
-﻿package utils;
+﻿package tones.utils;
 
 import js.html.Float32Array;
 
@@ -83,6 +83,12 @@ class NoteFrequencyUtil {
 		return null;
 	}
 	
+	/**
+	 * 
+	 * @param	name - Note name eg : 'A3' 'C#3' 'Gb1' 'C#-2'
+	 * 					Lowest is  'C-2' (C minus-two)
+	 * @return
+	 */
 	public function noteNameToIndex(name:String):Int{
 		var hasAlternate = name.indexOf("/");
 		if (hasAlternate != -1) name = name.substring(0, hasAlternate);
@@ -94,6 +100,17 @@ class NoteFrequencyUtil {
 		}
 		return -1;
 	}
+	
+	/**
+	 * 
+	 * @param	name
+	 * @return
+	 */
+	public function noteNameToFrequency(name:String):Float {
+		var i = noteNameToIndex(name);
+		return i > -1 ? indexToFrequency(i) : Math.NaN;
+	}
+
 	
 	
 	/**

@@ -1,3 +1,2 @@
 /bin/js/tones.js
-/bin/wavetables
-/bin/data/wavetables
+/bin/data/wavetables/*.json

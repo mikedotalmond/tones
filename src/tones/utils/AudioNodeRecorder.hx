@@ -1,7 +1,8 @@
 package tones.utils;
 
 /**
- * A Haxe port of Recorderjs - https://github.com/mattdiamond/Recorderjs
+ * A Haxe port of the Recorderjs interface - https://github.com/mattdiamond/Recorderjs
+ * Uses/requires the recorderWorker script from Recorderjs
  * 
  * Utility to record the output of an AudioNode and save as WAV
  * (encode process runs asynchronously in a webworker)
@@ -9,6 +10,7 @@ package tones.utils;
 
 import js.Browser;
 import hxsignal.Signal;
+import js.html.URL;
 
 import js.html.AnchorElement;
 
@@ -96,7 +98,7 @@ class AudioNodeRecorder {
     }
 
 	public function encodeWAV(){
-      worker.postMessage(EncodeWAVMessage);
+      worker.postMessage( EncodeWAVMessage );
 	}
 	
 	public static function forceDownload(blob:Blob, filename:String = 'output.wav') {
@@ -104,7 +106,7 @@ class AudioNodeRecorder {
 		var doc	:Document = js.Browser.window.document;
 		var link:AnchorElement = cast doc.createElement('a');
 		
-		link.href = DOMURL.createObjectURL(blob);
+		link.href = URL.createObjectURL(blob);
 		link.download = filename;
 		
 		var click = doc.createEvent("Event");
@@ -112,7 +114,12 @@ class AudioNodeRecorder {
 		link.dispatchEvent(click);
 	}
 	
-	static var GetBufferMessage		:Dynamic = { command: 'getBuffer' };
-	static var EncodeWAVMessage		:Dynamic = { command: 'exportWAV', type: 'audio/wav' };
-	static var ClearBufferMessage	:Dynamic = { command: 'clear' };
+	static var GetBufferMessage		:BufferMessage = { command: 'getBuffer' };
+	static var EncodeWAVMessage		:BufferMessage = { command: 'exportWAV', type: 'audio/wav' };
+	static var ClearBufferMessage	:BufferMessage = { command: 'clear' };
+}
+
+typedef BufferMessage = {
+	var command:String;
+	@:optional var type:String;
 }

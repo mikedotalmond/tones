@@ -22,7 +22,7 @@ class Main {
 		/** **/
 		//var customWaves	= new CustomWaves();
 		
-		/** A more complete example that combines the stuff seen in the earlier examples **/
+		/** Something a bit more complete that combines stuff seen in the earlier examples **/
 		var polysynth = new KeyboardControlled();
 	}
 }

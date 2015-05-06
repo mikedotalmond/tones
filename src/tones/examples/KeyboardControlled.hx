@@ -1,41 +1,40 @@
 package tones.examples;
 
+import hxsignal.Signal.ConnectionTimes;
 import js.Browser;
 import js.html.audio.AudioContext;
 import js.html.audio.GainNode;
-
-import tones.Tones;
-import tones.OscillatorType;
-
 import js.html.KeyboardEvent;
-
+import tones.OscillatorType;
+import tones.Tones;
 import tones.utils.KeyboardInput;
 import tones.utils.KeyboardNotes;
+import tones.utils.Wavetables;
 
 
 /**
  * ...
  * @author Mike Almond - https://github.com/mikedotalmond
  */
+
 class KeyboardControlled {
 	
 	var tonesA			:Tones;
 	var tonesB			:Tones;
+	var outGain			:GainNode;
+	var context			:AudioContext;
+	var wavetables		:Wavetables;
 	
 	var keyboardNotes	:KeyboardNotes;
 	var keyboardInput	:KeyboardInput;
-	
-	// keyboard - keyIsDown == activeKeys[keyCode]
-	var activeKeys		:Array<Bool>;
-	
-	// For active notes - map note-index (0-128) to the Tones noteID
-	var noteIndexToId	:Map<Int,Int>;
-	
-	var outGain	:GainNode;
-	var context	:AudioContext;
+	var noteIndexToId	:Map<Int,Int>; // For active notes - map note-index (0-128) to the Tones noteID
+	var activeKeys		:Array<Bool>; // (keyboard) keyIsDown == activeKeys[keyCode]
 	
 	
 	public function new() {	
+		
+		wavetables = new Wavetables();
+		wavetables.loadComplete.connect(wavetablesLoaded, ConnectionTimes.Once);
 		
 		context = Tones.createContext();
 		
@@ -59,9 +58,11 @@ class KeyboardControlled {
 		setupKeyboardControls();		
 	}
 	
+	function wavetablesLoaded() {
+		
+	}
 	
 	// ------------------------------------------------------------------------------------------------------
-	
 	
 	function setupKeyboardControls():Void {
 		
@@ -79,8 +80,7 @@ class KeyboardControlled {
 		
 		keyboardInput.noteOn.connect(handleNoteOn);
 		keyboardInput.noteOff.connect(handleNoteOff);
-	}
-	
+	}	
 	
 	function onKeyDown(e:KeyboardEvent) {
 		if (!keyIsDown(e.keyCode)) {
@@ -111,6 +111,6 @@ class KeyboardControlled {
 		noteIndexToId.remove(index);
 	}
 	
-	inline public function keyIsDown(code:Int):Bool return activeKeys[code];
+	inline function keyIsDown(code:Int):Bool return activeKeys[code];
 
 }

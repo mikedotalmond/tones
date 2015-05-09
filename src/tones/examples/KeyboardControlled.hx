@@ -1,5 +1,6 @@
 package tones.examples;
 
+import dat.gui.GUI;
 import hxsignal.Signal.ConnectionTimes;
 import js.Browser;
 import js.html.audio.AudioContext;
@@ -47,15 +48,15 @@ class KeyboardControlled {
 		
 		tonesA			= new Tones(context, outGain);
 		tonesA.type 	= OscillatorType.SQUARE;
-		tonesA.volume   = .2;
-		tonesA.attack  	= 10;
-		tonesA.release 	= 333;
+		tonesA.volume   = .62;
+		tonesA.attack  	= 1;
+		tonesA.release 	= 2000;
 		
 		tonesB			= new Tones(context, outGain);
 		tonesB.type 	= OscillatorType.SQUARE;
-		tonesB.volume   = .3;
-		tonesB.attack  	= 250;
-		tonesB.release 	= 500;
+		tonesB.volume   = .48;
+		tonesB.attack  	= 2000;
+		tonesB.release 	= 133;
 		
 		outGain.connect(context.destination);
 		
@@ -63,10 +64,65 @@ class KeyboardControlled {
 	}
 	
 	function wavetablesLoaded() {
-		trace('Wavetables loaded - click anywhere to change the oscillators');
-		Browser.document.addEventListener('click', onClick);
-		Browser.document.addEventListener('tap', onClick);
+		trace('Wavetables loaded');
+		//Browser.document.addEventListener('click', onClick);
+		//Browser.document.addEventListener('tap', onClick);
+		setupUI();
 	}
+	
+	
+	function setupUI() {
+		
+        var data = { volume:.5 };
+		
+        var gui = new GUI();
+		gui.add(data, 'volume', 0, 1).step(1 / 256).onChange(function() {
+			outGain.gain.setValueAtTime(data.volume, context.currentTime + .1);
+		});
+		gui.add(keyboardInput, 'octaveShift', -1, 3)
+			.step(1).onChange(function() { tonesA.releaseAll(); tonesB.releaseAll(); });
+		
+		var waveNames:Array<String> = ['Sine', 'Square', 'Sawtooth', 'Triangle'].concat([ for (item in wavetables.data) item.name ]);
+		
+		var folder:GUI;
+		folder = gui.addFolder('Tones A');
+		folder.add(tonesA, '_volume', 0, 1).step(1/256);
+		folder.add(tonesA, '_attack', 1, 2000).step(1/256);
+		folder.add(tonesA, '_release', 1, 2000).step(1/256);
+		folder.add( { waveform:'Square' }, 'waveform', waveNames).onChange(onWaveformSelect.bind(_, tonesA));
+		folder.open();
+		
+		folder = gui.addFolder('Tones B');
+		folder.add(tonesB, '_volume', 0, 1).step(1/256);
+		folder.add(tonesB, '_attack', 1, 2000).step(1/256);
+		folder.add(tonesB, '_release', 1, 2000).step(1/256);
+		folder.add( { waveform:'Square' }, 'waveform', waveNames).onChange(onWaveformSelect.bind(_, tonesB));
+		folder.open();
+	}	
+	
+	
+	function onWaveformSelect(value:String, target:Tones) {
+		switch(value) {
+			case 'Sine'		: target.type = OscillatorType.SINE;
+			case 'Square'	: target.type = OscillatorType.SQUARE;
+			case 'Sawtooth'	: target.type = OscillatorType.SAWTOOTH;
+			case 'Triangle'	: target.type = OscillatorType.TRIANGLE;
+			
+			default:
+				var data = getWavetableDataByName(value);
+				target.type = OscillatorType.CUSTOM;
+				target.customWave = context.createPeriodicWave(data.real, data.imag);
+		};
+	}
+	
+	
+	function getWavetableDataByName(value:String):WavetableData {
+		for (item in wavetables.data) {
+			if (item.name == value) return item;
+		}
+		return null;
+	}
+	
 	
 	function onClick(_):Void {
 		var d = wavetables.data;

@@ -6,6 +6,7 @@ import js.Browser;
 import js.html.audio.AudioContext;
 import js.html.audio.GainNode;
 import js.html.KeyboardEvent;
+import js.html.SelectElement;
 import tones.OscillatorType;
 import tones.Tones;
 import tones.utils.KeyboardInput;
@@ -30,12 +31,11 @@ class KeyboardControlled {
 	var keyboardInput	:KeyboardInput;
 	var noteIndexToId	:Map<Int,Int>; // For active notes - map note-index (0-128) to the Tones noteID
 	var activeKeys		:Array<Bool>; // (keyboard) keyIsDown == activeKeys[keyCode]
+	var allWaveNames:Array<String>;
+	var gui:dat.gui.GUI;
 	
 	
 	public function new() {	
-		
-		wavetables = new Wavetables();
-		wavetables.loadComplete.connect(wavetablesLoaded, ConnectionTimes.Once);
 		
 		// share a single context across 2 tones instances
 		// (could just as well be sharing with an effects library or other any other webaudio project really)
@@ -60,46 +60,97 @@ class KeyboardControlled {
 		
 		outGain.connect(context.destination);
 		
-		setupKeyboardControls();		
+		setupKeyboardControls();	
+		
+		allWaveNames = ['Sine', 'Square', 'Sawtooth', 'Triangle'];
+		
+		// load some wavetables...
+		wavetables = new Wavetables();
+		wavetables.loadComplete.connect(wavetablesLoaded, ConnectionTimes.Once);
+		
 	}
 	
 	function wavetablesLoaded() {
-		trace('Wavetables loaded');
-		//Browser.document.addEventListener('click', onClick);
-		//Browser.document.addEventListener('tap', onClick);
+		allWaveNames = allWaveNames.concat([ for (item in wavetables.data) item.name ]);
 		setupUI();
-	}
-	
+	}	
 	
 	function setupUI() {
 		
-        var data = { volume:.5 };
+        gui = new GUI();
 		
-        var gui = new GUI();
-		gui.add(data, 'volume', 0, 1).step(1 / 256).onChange(function() {
-			outGain.gain.setValueAtTime(data.volume, context.currentTime + .1);
-		});
-		gui.add(keyboardInput, 'octaveShift', -1, 3)
-			.step(1).onChange(function() { tonesA.releaseAll(); tonesB.releaseAll(); });
-		
-		var waveNames:Array<String> = ['Sine', 'Square', 'Sawtooth', 'Triangle'].concat([ for (item in wavetables.data) item.name ]);
+		gui.add({ volume:.5 }, 'volume', 0, 1).step(1 / 256).onChange(function(_) { outGain.gain.setValueAtTime(_, context.currentTime + .1); } );
+		gui.add(keyboardInput, 'octaveShift', -1, 3).step(1).onChange(releaseAll);
 		
 		var folder:GUI;
-		folder = gui.addFolder('Tones A');
-		folder.add(tonesA, '_volume', 0, 1).step(1/256);
-		folder.add(tonesA, '_attack', 1, 2000).step(1/256);
-		folder.add(tonesA, '_release', 1, 2000).step(1/256);
-		folder.add( { waveform:'Square' }, 'waveform', waveNames).onChange(onWaveformSelect.bind(_, tonesA));
+		
+		var rnd = gui.addFolder('Randomise');
+		rnd.add( { 'All': randomise.bind('all') }, 'All');
+		rnd.open();
+		
+		folder = rnd.addFolder('A');
+		folder.add( { 'type': selectRandomOsc.bind(0) }, 'type');
+		folder.add( { 'volume': randomise.bind('volume') }, 'volume');
+		folder.add( { 'attack': randomise.bind('attack') }, 'attack');
+		folder.add( { 'release': randomise.bind('release') }, 'release');
+		
+		folder = rnd.addFolder('B');
+		folder.add( { 'type': selectRandomOsc.bind(1) }, 'type');
+		folder.add( { 'volume': randomise.bind('volume') }, 'volume');
+		folder.add( { 'attack': randomise.bind('attack') }, 'attack');
+		folder.add( { 'release': randomise.bind('release') }, 'release');
+		
+		folder = gui.addFolder('Osc A');
+		folder.add(tonesA, '_volume', 0, 1).step(1/256).listen();
+		folder.add(tonesA, '_attack', 1, 2000).step(1/256).listen();
+		folder.add(tonesA, '_release', 1, 2000).step(1/256).listen();
+		folder.add( { waveform:'Square' }, 'waveform', allWaveNames).onChange(onWaveformSelect.bind(_, tonesA));
 		folder.open();
 		
-		folder = gui.addFolder('Tones B');
-		folder.add(tonesB, '_volume', 0, 1).step(1/256);
-		folder.add(tonesB, '_attack', 1, 2000).step(1/256);
-		folder.add(tonesB, '_release', 1, 2000).step(1/256);
-		folder.add( { waveform:'Square' }, 'waveform', waveNames).onChange(onWaveformSelect.bind(_, tonesB));
+		folder = gui.addFolder('Osc B');
+		folder.add(tonesB, '_volume', 0, 1).step(1/256).listen();
+		folder.add(tonesB, '_attack', 1, 2000).step(1/256).listen();
+		folder.add(tonesB, '_release', 1, 2000).step(1/256).listen();
+		folder.add( { waveform:'Square' }, 'waveform', allWaveNames).onChange(onWaveformSelect.bind(_, tonesB));
 		folder.open();
-	}	
+	}
 	
+	function releaseAll() {
+		tonesA.releaseAll(); tonesB.releaseAll();
+	}
+	
+	function randomise(type:String) {
+		
+		releaseAll();
+		
+		switch(type) {
+			case 'volume':
+				tonesA.volume = .01 + Math.random();
+				tonesB.volume = .01 + Math.random();
+			case 'attack':
+				tonesA.attack = Math.random() * 2000;
+				tonesB.attack = Math.random() * 2000;
+			case 'release':
+				tonesA.release = Math.random() * 2000;
+				tonesB.release = Math.random() * 2000;
+			case 'all': 
+				selectRandomOsc(0);
+				selectRandomOsc(1);
+				randomise('volume');
+				randomise('attack');
+				randomise('release');
+		}
+	}
+	
+	function selectRandomOsc(index:Int):Void {
+		
+		var selects = Browser.document.querySelectorAll('select');
+		
+		var i = Std.int(Math.random() * allWaveNames.length);
+		onWaveformSelect(allWaveNames[i], index == 0 ? tonesA : tonesB);
+		
+		cast(selects.item(index), SelectElement).selectedIndex = i;
+	}
 	
 	function onWaveformSelect(value:String, target:Tones) {
 		switch(value) {
@@ -112,9 +163,9 @@ class KeyboardControlled {
 				var data = getWavetableDataByName(value);
 				target.type = OscillatorType.CUSTOM;
 				target.customWave = context.createPeriodicWave(data.real, data.imag);
-		};
+		};		
+		trace('Oscillator set to ${value}');
 	}
-	
 	
 	function getWavetableDataByName(value:String):WavetableData {
 		for (item in wavetables.data) {
@@ -124,25 +175,8 @@ class KeyboardControlled {
 	}
 	
 	
-	function onClick(_):Void {
-		var d = wavetables.data;
-		
-		// pick randomly from all wavetables
-		
-		var i = Std.int(Math.random() * d.length);
-		tonesA.type = OscillatorType.CUSTOM;
-		tonesA.customWave = context.createPeriodicWave(d[i].real, d[i].imag);
-		trace('tonesA Oscillator changed to ${d[i].name}');
-		
-		// 50% of the time set a different random osc for tonesB
-		if (Math.random() > .5) i = Std.int(Math.random() * d.length);
-		
-		tonesB.type = OscillatorType.CUSTOM;
-		tonesB.customWave = context.createPeriodicWave(d[i].real, d[i].imag);
-		trace('tonesB Oscillator changed to ${d[i].name}');
-	}
-	
 	// ------------------------------------------------------------------------------------------------------
+	
 	
 	function setupKeyboardControls():Void {
 		

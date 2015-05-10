@@ -16,7 +16,7 @@ class Main {
 		/** Play and hold a tone, then release it later **/
 		//var releaseLater = new ReleaseLater();
 		
-		/** Sharing, or using a shnared, AudioContext **/
+		/** Sharing, or using a shared, AudioContext **/
 		//var sharedContext = new SharedContext();
 		
 		/** **/

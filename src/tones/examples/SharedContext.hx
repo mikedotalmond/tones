@@ -20,10 +20,7 @@ class SharedContext {
 		masterVolume.gain.value = .5;
 		masterVolume.connect(context.destination); // connect the volume control to the context's destintion
 		
-		
-		
-		
-		// Create another tones instance and pass it an existing context and alternate destination node
+		var tones1 = new Tones(context, masterVolume);
 		var tones2 = new Tones(context, masterVolume);
 		
 	}

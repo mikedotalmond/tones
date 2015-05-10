@@ -60,7 +60,8 @@ class CustomWaves {
 			case 'mouseup':mouseIsDown = false;
 			case 'mousemove':
 				if (mouseIsDown) {
-					// hmm, it's pretty fast - sounds a bit like granular synthesis
+					// hmm, it's pretty fast when playing on mousemove - like granular synthesis.
+					// maybe worth making a granular resynth/sample player. they're always fun.
 					tones.volume = (e.clientY / Browser.window.innerHeight) * .4;
 					tones.playFrequency(220 + 440 * (e.clientX / Browser.window.innerWidth));
 				}

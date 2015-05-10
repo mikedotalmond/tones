@@ -8,7 +8,7 @@ import js.html.Float32Array;
 */
 class NoteFrequencyUtil {
 	
-	static inline var defaultTuning	:Float = 440.0;
+	static inline var defaultTuning	:Float = 440.0; // a440
 	
 	static inline var LOG2E			:Float = 1.4426950408889634; //Math.LOG2E
 	

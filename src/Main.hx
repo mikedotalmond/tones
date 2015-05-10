@@ -22,7 +22,14 @@ class Main {
 		/** **/
 		//var customWaves	= new CustomWaves();
 		
-		/** Something a bit more complete that combines stuff seen in the earlier examples **/
+		/** 
+		 * Something a bit more complete that combines stuff seen in the earlier examples 
+		 * - 2x Tones instances with a shared context and common output gain
+		 * - 2nd Oscillator is slightly detuned and has a phase offset (changes randomly on each note)
+		 * - wavetables (periodicWave)
+		 * - keyboard controls to play notes
+		 * - dat.GUI controls
+		 * **/
 		var polysynth = new KeyboardControlled();
 	}
 }

@@ -85,20 +85,20 @@ class KeyboardControlled {
 		var folder:GUI;
 		
 		var rnd = gui.addFolder('Randomise');
-		rnd.add( { 'All': randomise.bind('all') }, 'All');
+		rnd.add( { 'All': randomise.bind(-1, 'all') }, 'All');
 		rnd.open();
 		
 		folder = rnd.addFolder('A');
 		folder.add( { 'type': selectRandomOsc.bind(0) }, 'type');
-		folder.add( { 'volume': randomise.bind('volume') }, 'volume');
-		folder.add( { 'attack': randomise.bind('attack') }, 'attack');
-		folder.add( { 'release': randomise.bind('release') }, 'release');
+		folder.add( { 'volume': randomise.bind(0,'volume') }, 'volume');
+		folder.add( { 'attack': randomise.bind(0,'attack') }, 'attack');
+		folder.add( { 'release': randomise.bind(0,'release') }, 'release');
 		
 		folder = rnd.addFolder('B');
 		folder.add( { 'type': selectRandomOsc.bind(1) }, 'type');
-		folder.add( { 'volume': randomise.bind('volume') }, 'volume');
-		folder.add( { 'attack': randomise.bind('attack') }, 'attack');
-		folder.add( { 'release': randomise.bind('release') }, 'release');
+		folder.add( { 'volume': randomise.bind(1,'volume') }, 'volume');
+		folder.add( { 'attack': randomise.bind(1,'attack') }, 'attack');
+		folder.add( { 'release': randomise.bind(1,'release') }, 'release');
 		
 		folder = gui.addFolder('Osc A');
 		folder.add(tonesA, '_volume', 0, 1).step(1/256).listen();
@@ -119,26 +119,24 @@ class KeyboardControlled {
 		tonesA.releaseAll(); tonesB.releaseAll();
 	}
 	
-	function randomise(type:String) {
+	function randomise(tIndex:Int, type:String) {
+		
+		var t = tIndex == 0 ? tonesA : tonesB;
 		
 		releaseAll();
 		
 		switch(type) {
 			case 'volume':
-				tonesA.volume = .01 + Math.random();
-				tonesB.volume = .01 + Math.random();
+				t.volume = .01 + Math.random();
 			case 'attack':
-				tonesA.attack = Math.random() * 2000;
-				tonesB.attack = Math.random() * 2000;
+				t.attack = Math.random() * 2000;
 			case 'release':
-				tonesA.release = Math.random() * 2000;
-				tonesB.release = Math.random() * 2000;
+				t.release = Math.random() * 2000;
 			case 'all': 
-				selectRandomOsc(0);
-				selectRandomOsc(1);
-				randomise('volume');
-				randomise('attack');
-				randomise('release');
+				selectRandomOsc(0);	selectRandomOsc(1);
+				randomise(0,'volume'); randomise(1,'volume');
+				randomise(0,'attack'); randomise(1,'attack');
+				randomise(0,'release'); randomise(1,'release');
 		}
 	}
 	

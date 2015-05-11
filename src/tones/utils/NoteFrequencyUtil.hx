@@ -63,12 +63,6 @@ class NoteFrequencyUtil {
 		return Math.NaN;
 	}
 	
-	public function detuneFreq(freq:Float, cents:Float):Float {
-		if (cents < 0) return freq / Math.pow(2, -cents * centExp);
-		else if (cents > 0) return freq * Math.pow(2, cents * centExp);
-		return freq; 
-	}
-	
 	public inline function frequencyToNoteIndex(frequency:Float):Int {
 		return Std.int(frequencyToNote(frequency));
 	}
@@ -160,6 +154,18 @@ class NoteFrequencyUtil {
 		return value;
 	}
 	
+	
+	/**
+	 * Detune a given (note) frequency by a set number of cents (cent = note/100)
+	 * @param	freq
+	 * @param	cents
+	 * @return
+	 */
+	public static function detuneFreq(freq:Float, cents:Float):Float {
+		if (cents < 0) return freq / Math.pow(2, -cents * centExp);
+		else if (cents > 0) return freq * Math.pow(2, cents * centExp);
+		return freq; 
+	}
 	
 	
 	/**

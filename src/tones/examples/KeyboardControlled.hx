@@ -83,36 +83,39 @@ class KeyboardControlled {
 		gui.add(keyboardInput, 'octaveShift', -1, 3).step(1).onChange(releaseAll);
 		
 		var folder:GUI;
+		var folder2:GUI;
 		
-		var rnd = gui.addFolder('Randomise');
-		rnd.add( { 'All': randomise.bind(-1, 'all') }, 'All');
-		rnd.open();
-		
-		folder = rnd.addFolder('A');
-		folder.add( { 'type': selectRandomOsc.bind(0) }, 'type');
-		folder.add( { 'volume': randomise.bind(0,'volume') }, 'volume');
-		folder.add( { 'attack': randomise.bind(0,'attack') }, 'attack');
-		folder.add( { 'release': randomise.bind(0,'release') }, 'release');
-		
-		folder = rnd.addFolder('B');
-		folder.add( { 'type': selectRandomOsc.bind(1) }, 'type');
-		folder.add( { 'volume': randomise.bind(1,'volume') }, 'volume');
-		folder.add( { 'attack': randomise.bind(1,'attack') }, 'attack');
-		folder.add( { 'release': randomise.bind(1,'release') }, 'release');
+		gui.add( { 'Randomise all': randomise.bind(-1, 'all') }, 'Randomise all');
+		//rnd.open();
 		
 		folder = gui.addFolder('Osc A');
+		folder2 = folder.addFolder('Randomise');
 		folder.add(tonesA, '_volume', 0, 1).step(1/256).listen();
 		folder.add(tonesA, '_attack', 1, 2000).step(1/256).listen();
 		folder.add(tonesA, '_release', 1, 2000).step(1/256).listen();
 		folder.add( { waveform:'Square' }, 'waveform', allWaveNames).onChange(onWaveformSelect.bind(_, tonesA));
 		folder.open();
 		
+		folder2.add( { 'all': randomise.bind(0, 'all') }, 'all');
+		folder2.add( { 'type': selectRandomOsc.bind(0) }, 'type');
+		folder2.add( { 'volume': randomise.bind(0,'volume') }, 'volume');
+		folder2.add( { 'attack': randomise.bind(0,'attack') }, 'attack');
+		folder2.add( { 'release': randomise.bind(0,'release') }, 'release');
+		
 		folder = gui.addFolder('Osc B');
+		folder2 = folder.addFolder('Randomise');
 		folder.add(tonesB, '_volume', 0, 1).step(1/256).listen();
 		folder.add(tonesB, '_attack', 1, 2000).step(1/256).listen();
 		folder.add(tonesB, '_release', 1, 2000).step(1/256).listen();
 		folder.add( { waveform:'Square' }, 'waveform', allWaveNames).onChange(onWaveformSelect.bind(_, tonesB));
 		folder.open();
+		
+		folder2.add( { 'all': randomise.bind(1, 'all') }, 'all');
+		folder2.add( { 'type': selectRandomOsc.bind(1) }, 'type');
+		folder2.add( { 'volume': randomise.bind(1,'volume') }, 'volume');
+		folder2.add( { 'attack': randomise.bind(1,'attack') }, 'attack');
+		folder2.add( { 'release': randomise.bind(1,'release') }, 'release');
+		
 	}
 	
 	function releaseAll() {
@@ -133,10 +136,15 @@ class KeyboardControlled {
 			case 'release':
 				t.release = Math.random() * 2000;
 			case 'all': 
-				selectRandomOsc(0);	selectRandomOsc(1);
-				randomise(0,'volume'); randomise(1,'volume');
-				randomise(0,'attack'); randomise(1,'attack');
-				randomise(0,'release'); randomise(1,'release');
+				if (tIndex == -1) {
+					randomise(0, 'all');
+					randomise(1, 'all');
+				} else {
+					selectRandomOsc(tIndex);
+					randomise(tIndex,'volume');
+					randomise(tIndex,'attack');
+					randomise(tIndex,'release');
+				}
 		}
 	}
 	
@@ -209,7 +217,6 @@ class KeyboardControlled {
 	}
 	
 	function handleNoteOn(index:Int, volume:Float) {
-		
 		var f = keyboardNotes.noteIndexToFrequency(index);
 		var f2 = keyboardNotes.noteFreq.detuneFreq(f, (Math.random() -.5) * 25);
 		
@@ -220,12 +227,14 @@ class KeyboardControlled {
 		
 		noteIndexToId.set(index, tonesA.playFrequency(f, 0, false));
 		noteIndexToId.set(index, tonesB.playFrequency(f2, phaseShift, false));
+		trace('note on:${keyboardNotes.noteFreq.noteIndexToName(index)}');
 	}
 	
 	function handleNoteOff(index:Int) {
 		tonesA.releaseNote(noteIndexToId.get(index));
 		tonesB.releaseNote(noteIndexToId.get(index));
 		noteIndexToId.remove(index);
+		trace('note off:${keyboardNotes.noteFreq.noteIndexToName(index)}');
 	}
 	
 	inline function keyIsDown(code:Int):Bool return activeKeys[code];

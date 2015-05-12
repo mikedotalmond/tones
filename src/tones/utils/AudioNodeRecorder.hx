@@ -2,10 +2,10 @@ package tones.utils;
 
 /**
  * A Haxe port of the Recorderjs interface - https://github.com/mattdiamond/Recorderjs
- * Uses/requires the recorderWorker script from Recorderjs
+ * Uses/requires the recorderWorker.js script from Recorderjs
  * 
  * Utility to record the output of an AudioNode and save as WAV
- * (encode process runs asynchronously in a webworker)
+ * (encode process runs asynchronously in a worker)
  */
 
 import js.Browser;
@@ -33,12 +33,11 @@ class AudioNodeRecorder {
 	public var bufferExported	(default, null):Signal<Array<Float32Array>->Void>;
 
 	var worker	:Worker;
-	var context	:AudioContext;
 	var node	:ScriptProcessorNode;
 	
 	public function new(source:AudioNode, bufferSize:Int=4096, workerPath:String='js/recorderWorker.js') {
 		
-		context 		= source.context;
+		var context 	= source.context;
 		node 			= context.createScriptProcessor(bufferSize, 2, 2);
 		worker 			= new Worker(workerPath);
 		recording		= false;
@@ -53,7 +52,7 @@ class AudioNodeRecorder {
 		
 		worker.onmessage = onWorkerMessage;
 		node.onaudioprocess = onAudioProcess;
-
+		
 		source.connect(node);
 		node.connect(context.destination); // this should not be necessary	
 	}
@@ -81,25 +80,14 @@ class AudioNodeRecorder {
 		});	  
 	}
 	
-    inline public function start () {
-      recording = true;
-	}
 	
-    inline public function stop (){
-      recording = false;
-    }
+    inline public function start() recording = true;
+    inline public function stop() recording = false;
 
-	public function clear (){
-      worker.postMessage( ClearBufferMessage );
-    }
+	inline public function clear() worker.postMessage( ClearBufferMessage );
+	inline public function getBuffer() worker.postMessage( GetBufferMessage );
+	inline public function encodeWAV() worker.postMessage( EncodeWAVMessage );
 	
-	public function getBuffer() {
-      worker.postMessage( GetBufferMessage );
-    }
-
-	public function encodeWAV(){
-      worker.postMessage( EncodeWAVMessage );
-	}
 	
 	public static function forceDownload(blob:Blob, filename:String = 'output.wav') {
 		

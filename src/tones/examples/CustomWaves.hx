@@ -1,6 +1,9 @@
 package tones.examples;
 
+import haxe.Timer;
 import hxsignal.Signal.ConnectionTimes;
+import js.html.KeyboardEvent;
+import tones.utils.NoteFrequencyUtil;
 
 import js.Browser;
 import js.html.audio.PeriodicWave;
@@ -20,15 +23,25 @@ class CustomWaves {
 
 	public function new() {
 		
+		var p = Browser.document.createParagraphElement(); 
+		p.className = "noselect";
+		p.textContent = "Mousedown and move the cursor. Press any key to select a new random wavetable. Check the dev console for some stats.";
+		Browser.document.body.appendChild(p);
+		
+		Browser.document.addEventListener('keydown', function(e:KeyboardEvent) {
+			var i = Std.int(Math.random() * wavetables.data.length);
+			setWave(i);
+		});
+		
+		
 		tones = new Tones();
-		tones.volume = .2;
-		tones.attack = 100;
-		tones.release = 750;
+		tones.volume = .15;
+		tones.attack = 250;
+		tones.release = 500;
 		tones.type = OscillatorType.CUSTOM;
 		
 		wavetables = new Wavetables();
 		wavetables.loadComplete.connect(wavetablesLoaded, ConnectionTimes.Once);
-		
 	}
 	
 	function wavetablesLoaded() {
@@ -39,10 +52,6 @@ class CustomWaves {
 		var i = Std.int(Math.random() * wavetables.data.length);
 		setWave(i);
 		
-		tones.playFrequency(880);
-		tones.playFrequency(440);
-		tones.playFrequency(220);
-		
 		Browser.document.addEventListener('mousedown', onMouse); 
 		Browser.document.addEventListener('mouseup', onMouse); 
 		Browser.document.addEventListener('mousemove', onMouse); 
@@ -50,9 +59,11 @@ class CustomWaves {
 	
 	function setWave(index:Int) {
 		var data = wavetables.data[index];
+		trace('set wavetable to ${data.name}');
 		tones.customWave = tones.context.createPeriodicWave(data.real, data.imag);
 	}
 	
+	var lastTime:Float = 0;
 	var mouseIsDown:Bool = false;
 	function onMouse(e:MouseEvent):Void {
 		switch(e.type) {
@@ -60,10 +71,23 @@ class CustomWaves {
 			case 'mouseup':mouseIsDown = false;
 			case 'mousemove':
 				if (mouseIsDown) {
-					// hmm, it's pretty fast when playing on mousemove - like granular synthesis.
+					// hmm, it's pretty fast when playing on mousemove with no rate limit - not unlike granular synthesis.
 					// maybe worth making a granular resynth/sample player. they're always fun.
-					tones.volume = (e.clientY / Browser.window.innerHeight) * .4;
-					tones.playFrequency(220 + 440 * (e.clientX / Browser.window.innerWidth));
+					var now = Timer.stamp();
+					var dt = now - lastTime;
+					
+					if (dt > .1) { // limit playback rate a little...
+						lastTime = now;
+					
+						tones.volume = (e.clientY / Browser.window.innerHeight) * .2;
+						
+						var f = 50 + 750 * (e.clientX / Browser.window.innerWidth);
+						f = f < 20 ? 20 : f;
+						
+						tones.playFrequency(f);
+						tones.playFrequency(NoteFrequencyUtil.detuneFreq(f * 2, (Math.random()-.5) * 50));
+						
+					}
 				}
 
 		}

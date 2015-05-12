@@ -88,13 +88,15 @@ class Tones {
 	/**
 	 * Play a frequency
 	 * notes.playFrequency(440); // plays a 440 Hz tone
+	 * notes.playFrequency(440, 1); // plays a 440 Hz tone, in one second
+	 * notes.playFrequency(440, 1, false); // plays a 440 Hz tone, in one second, and doesn't release untill you call releaseNote(noteId)
 	 *
-	 * @param	freq
+	 * @param	freq		- A frequency, expressed in Hertz, and above zero. Typically in the audible range 20Hz-20KHz
 	 * @param	delayBy		- A time, in seconds, to delay triggering this note by.
 	 * @param	autoRelease - Release as soon as attack phase ends - default behaviour (true)
 	 * 						  when false the note will play until releaseNote(noteId) is called
 	 * 						- Don't use these behaviours at the same time in one Tones instance 
-	 * @return 	noteId
+	 * @return 	noteId		- The ID assigned to the note being played. Use for releaseNote() when using autoRelease=false
 	 */
     public function playFrequency(freq:Float, delayBy:Float = .0, autoRelease:Bool = true):Int {
 	   

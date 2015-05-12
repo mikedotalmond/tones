@@ -11,6 +11,7 @@ import tones.OscillatorType;
 import tones.Tones;
 import tones.utils.KeyboardInput;
 import tones.utils.KeyboardNotes;
+import tones.utils.NoteFrequencyUtil;
 import tones.utils.Wavetables;
 
 
@@ -25,17 +26,23 @@ class KeyboardControlled {
 	var tonesB			:Tones;
 	var outGain			:GainNode;
 	var context			:AudioContext;
-	var wavetables		:Wavetables;
+	var wavetables		:Wavetables;	
+	var allWaveNames	:Array<String>;
 	
 	var keyboardNotes	:KeyboardNotes;
 	var keyboardInput	:KeyboardInput;
 	var noteIndexToId	:Map<Int,Int>; // For active notes - map note-index (0-128) to the Tones noteID
 	var activeKeys		:Array<Bool>; // (keyboard) keyIsDown == activeKeys[keyCode]
-	var allWaveNames:Array<String>;
-	var gui:dat.gui.GUI;
+	
+	var gui				:GUI;
 	
 	
 	public function new() {	
+		
+		var p = Browser.document.createParagraphElement();
+		p.className = "noselect";
+		p.textContent = "Play using your keyboard. Check the dev console for some stats.";
+		Browser.document.body.appendChild(p);
 		
 		// share a single context across 2 tones instances
 		// (could just as well be sharing with an effects library or other any other webaudio project really)
@@ -137,8 +144,8 @@ class KeyboardControlled {
 				t.release = Math.random() * 2000;
 			case 'all': 
 				if (tIndex == -1) {
-					randomise(0, 'all');
-					randomise(1, 'all');
+					randomise(0, type);
+					randomise(1, type);
 				} else {
 					selectRandomOsc(tIndex);
 					randomise(tIndex,'volume');
@@ -218,7 +225,7 @@ class KeyboardControlled {
 	
 	function handleNoteOn(index:Int, volume:Float) {
 		var f = keyboardNotes.noteIndexToFrequency(index);
-		var f2 = keyboardNotes.noteFreq.detuneFreq(f, (Math.random() -.5) * 25);
+		var f2 = NoteFrequencyUtil.detuneFreq(f, (Math.random() -.5) * 25);
 		
 		var t 			= 1 / f;
 		var phaseShift 	= t * (1 / (Math.random() * 6));
@@ -238,5 +245,4 @@ class KeyboardControlled {
 	}
 	
 	inline function keyIsDown(code:Int):Bool return activeKeys[code];
-
 }

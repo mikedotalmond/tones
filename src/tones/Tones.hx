@@ -128,7 +128,7 @@ class Tones {
 		
 		if (autoRelease) {
 			envelope.gain.setTargetAtTime(0, releaseTime, getTimeConstant(release / 1000));
-			Timer.delay(stop.bind(id), Math.round(attack + release));
+			Timer.delay(stop.bind(id), Math.round(delayBy * 1000 + attack + release));
 		}
 		
 		trace('On  | Polyphony:$polyphony, noteId:$id, freq:$freq, delayBy:$delayBy');

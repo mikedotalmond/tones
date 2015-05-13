@@ -800,10 +800,11 @@ tones_OscillatorTypeShim.__name__ = true;
 var tones_Tones = function(audioContext,destinationNode) {
 	this.ID = 0;
 	this.customWave = null;
+	var _g = this;
 	if(audioContext == null) this.context = tones_Tones.createContext(); else this.context = audioContext;
 	if(destinationNode == null) this.destination = this.context.destination; else this.destination = destinationNode;
 	this.polyphony = 0;
-	this.activeNotes = new haxe_ds_IntMap();
+	this.activeTones = new haxe_ds_IntMap();
 	this.toneBegin = new hxsignal_impl_Signal2();
 	this.toneEnd = new hxsignal_impl_Signal2();
 	this.releaseFudge = window.navigator.userAgent.indexOf("Firefox") > -1?4096 / this.context.sampleRate:0;
@@ -811,6 +812,12 @@ var tones_Tones = function(audioContext,destinationNode) {
 	this.set_attack(10.0);
 	this.set_release(100.0);
 	this.set_volume(.1);
+	this.toneBegin.connect(function(id,poly) {
+		console.log("toneBegin | id:" + id + ", polyphony:" + poly + ", time:" + _g.context.currentTime);
+	});
+	this.toneEnd.connect(function(id1,poly1) {
+		console.log("toneEnd | id:" + id1 + ", polyphony:" + poly1 + ", time:" + _g.context.currentTime);
+	});
 };
 tones_Tones.__name__ = true;
 tones_Tones.createContext = function() {
@@ -834,7 +841,7 @@ tones_Tones.prototype = {
 		osc.frequency.value = freq;
 		osc.connect(envelope);
 		osc.start(triggerTime);
-		this.activeNotes.h[id] = { id : id, osc : osc, env : envelope, release : this._release, attackEnd : triggerTime + attackSeconds};
+		this.activeTones.h[id] = { id : id, osc : osc, env : envelope, release : this._release, attackEnd : triggerTime + attackSeconds};
 		var delayMillis = Math.floor(delayBy * 1000);
 		if(delayMillis == 0) this.triggerToneBegin(id); else {
 			var tmp;
@@ -848,7 +855,7 @@ tones_Tones.prototype = {
 		if(autoRelease) {
 			envelope.gain.setTargetAtTime(0,releaseTime,Math.log(this._release / 1000 + 1.0) / 4.605170185988092);
 			var tmp1;
-			var f1 = $bind(this,this.stop);
+			var f1 = $bind(this,this.doStop);
 			var id2 = id;
 			tmp1 = function() {
 				f1(id2);
@@ -857,11 +864,6 @@ tones_Tones.prototype = {
 		}
 		return id;
 	}
-	,triggerToneBegin: function(id) {
-		this.polyphony++;
-		this.toneBegin.emit(id,this.polyphony);
-		console.log("On | Polyphony:" + this.polyphony + ", noteId:" + id);
-	}
 	,play: function(playData) {
 		this.set_volume(playData.volume);
 		this.set_attack(playData.attack);
@@ -869,15 +871,15 @@ tones_Tones.prototype = {
 		this.type = playData.type;
 		return this.playFrequency(playData.freq,playData.delay == null?0:playData.delay);
 	}
-	,releaseNote: function(id) {
-		var note = this.activeNotes.h[id];
-		if(note == null) return;
+	,doRelease: function(id) {
+		var data = this.activeTones.h[id];
+		if(data == null) return;
 		var t = this.context.currentTime + this.releaseFudge;
-		var r = note.release;
-		if(note.attackEnd > this.context.currentTime) note.env.gain.cancelScheduledValues(t);
-		note.env.gain.setTargetAtTime(0,t,Math.log(r / 1000 + 1.0) / 4.605170185988092);
+		var r = data.release;
+		if(data.attackEnd > this.context.currentTime) data.env.gain.cancelScheduledValues(t);
+		data.env.gain.setTargetAtTime(0,t,Math.log(r / 1000 + 1.0) / 4.605170185988092);
 		var tmp;
-		var f = $bind(this,this.stop);
+		var f = $bind(this,this.doStop);
 		var id1 = id;
 		tmp = function() {
 			f(id1);
@@ -885,23 +887,21 @@ tones_Tones.prototype = {
 		haxe_Timer.delay(tmp,Math.round(r));
 	}
 	,releaseAll: function() {
-		var $it0 = this.activeNotes.keys();
+		var $it0 = this.activeTones.keys();
 		while( $it0.hasNext() ) {
 			var id = $it0.next();
-			this.releaseNote(id);
+			this.doRelease(id);
 		}
 	}
-	,stop: function(id) {
-		var note = this.activeNotes.h[id];
-		if(note == null) return;
-		note.osc.stop(this.context.currentTime);
-		note.osc.disconnect();
-		note.env.gain.cancelScheduledValues(this.context.currentTime);
-		note.env.disconnect();
-		this.activeNotes.remove(id);
-		this.polyphony--;
-		this.toneEnd.emit(id,this.polyphony);
-		console.log("Off | Polyphony:" + this.polyphony + ", noteId:" + id);
+	,doStop: function(id) {
+		var data = this.activeTones.h[id];
+		if(data == null) return;
+		data.osc.stop(this.context.currentTime);
+		data.osc.disconnect();
+		data.env.gain.cancelScheduledValues(this.context.currentTime);
+		data.env.disconnect();
+		this.activeTones.remove(id);
+		this.triggerToneEnd(id);
 	}
 	,set_attack: function(value) {
 		if(value < 1) value = 1;
@@ -914,6 +914,14 @@ tones_Tones.prototype = {
 	,set_volume: function(value) {
 		if(value < 0) value = 0; else if(value > 1) value = 1;
 		return this._volume = value;
+	}
+	,triggerToneBegin: function(id) {
+		this.polyphony++;
+		this.toneBegin.emit(id,this.polyphony);
+	}
+	,triggerToneEnd: function(id) {
+		this.polyphony--;
+		this.toneEnd.emit(id,this.polyphony);
 	}
 	,__class__: tones_Tones
 };
@@ -1257,8 +1265,8 @@ tones_examples_KeyboardControlled.prototype = {
 		console.log("note on:" + (index >= 0 && index < 128?this.keyboardNotes.noteFreq.noteNames[index]:null));
 	}
 	,handleNoteOff: function(index) {
-		this.tonesA.releaseNote(this.noteIndexToId.h[index]);
-		this.tonesB.releaseNote(this.noteIndexToId.h[index]);
+		this.tonesA.doRelease(this.noteIndexToId.h[index]);
+		this.tonesB.doRelease(this.noteIndexToId.h[index]);
 		this.noteIndexToId.remove(index);
 		console.log("note off:" + (index >= 0 && index < 128?this.keyboardNotes.noteFreq.noteNames[index]:null));
 	}
@@ -1272,7 +1280,7 @@ var tones_examples_ReleaseLater = function() {
 	tones2.set_release(2500);
 	var noteId = tones2.playFrequency(540,.1,false);
 	haxe_Timer.delay(function() {
-		tones2.releaseNote(noteId);
+		tones2.doRelease(noteId);
 	},2500);
 };
 tones_examples_ReleaseLater.__name__ = true;

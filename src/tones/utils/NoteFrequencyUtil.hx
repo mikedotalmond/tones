@@ -15,8 +15,8 @@ class NoteFrequencyUtil {
 	static inline var Twelveth		:Float = 1 / 12;
 	static inline var centExp		:Float = 1 / 1200;
 	
-	static var pitchNames	:Array<String>;
-	static var altPitchNames:Array<String>;
+	public static var pitchNames	(default, null):Array<String>;
+	public static var altPitchNames	(default, null):Array<String>;
 	
 	var noteFrequencies		:Float32Array;
 	var noteNames			:Array<String>;

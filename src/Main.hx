@@ -30,8 +30,12 @@ class Main {
 				var customWaves = new CustomWaves();
 		
 			case "?sequence":
-				/** simple sequencing examples **/
+				/** a sequencing example **/
 				var sequence = new Sequence();
+				
+			case "?randomSequence":
+				/** playing random tones. forever. **/
+				var randomSequence = new RandomSequence();
 				
 			case "?polysynth":
 				/** 

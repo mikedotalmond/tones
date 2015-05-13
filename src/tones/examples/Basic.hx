@@ -27,7 +27,7 @@ class Basic {
 		
 		// NoteFrequencyUtil has various util/conversion functions for working with musical notes and frequencies
 		var freqUtil = new NoteFrequencyUtil();
-		tones.playFrequency(freqUtil.noteNameToFrequency('C3'));
+		tones.playFrequency(freqUtil.noteNameToFrequency('G3'), 1); // play a G3 tone after 1 second.
 		
 	}	
 }

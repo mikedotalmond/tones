@@ -12,18 +12,24 @@ class ReleaseLater {
 		var tones = new Tones(); // create 
 		
 		// change some settings...
-		tones.type = OscillatorType.SAWTOOTH;
-		tones.volume = .2;
+		tones.type = OscillatorType.SQUARE;
+		tones.volume = .05;
 		tones.attack = 200;
 		tones.release = 2500;
 		
 		// wait .1 seconds, then play a note that won't release until you call doRelease(id)
-		var noteId = tones.playFrequency(540, .1, false); // play a 440Hz tone with the default settings.
+		var noteId1 = tones.playFrequency(220, .1, false);
 		
-		// wait 2.5 seconds, then release
+		// play a second tone ery slightly after the precious
+		tones.volume = .03;
+		tones.type = OscillatorType.SAWTOOTH;
+		var noteId2 = tones.playFrequency(111, .1001, false);
+		
+		// wait 2.25 seconds, then release
 		Timer.delay(function() {
-			tones.doRelease(noteId);			
-		}, 2500);
+			tones.doRelease(noteId1);			
+			tones.doRelease(noteId2);			
+		}, 2250);
 	}
 	
 }

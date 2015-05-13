@@ -166,6 +166,7 @@ class KeyboardControlled {
 	}
 	
 	function onWaveformSelect(value:String, target:Tones) {
+				
 		switch(value) {
 			case 'Sine'		: target.type = OscillatorType.SINE;
 			case 'Square'	: target.type = OscillatorType.SQUARE;
@@ -176,7 +177,8 @@ class KeyboardControlled {
 				var data = getWavetableDataByName(value);
 				target.type = OscillatorType.CUSTOM;
 				target.customWave = context.createPeriodicWave(data.real, data.imag);
-		};		
+		};	
+		
 		trace('Oscillator set to ${value}');
 	}
 	
@@ -238,8 +240,8 @@ class KeyboardControlled {
 	}
 	
 	function handleNoteOff(index:Int) {
-		tonesA.releaseNote(noteIndexToId.get(index));
-		tonesB.releaseNote(noteIndexToId.get(index));
+		tonesA.doRelease(noteIndexToId.get(index));
+		tonesB.doRelease(noteIndexToId.get(index));
 		noteIndexToId.remove(index);
 		trace('note off:${keyboardNotes.noteFreq.noteIndexToName(index)}');
 	}

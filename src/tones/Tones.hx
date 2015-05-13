@@ -36,20 +36,19 @@ class Tones {
 	public var context(default, null):AudioContext;
 	public var destination(default, null):AudioNode;
 	
-	public var activeNotes(default, null):Map<Int, Note>;
 	
 	public var type:OscillatorType;	
 	public var customWave:PeriodicWave = null;
 	
-	public var attack(get, set):Float; // milliseconds
-	public var release(get, set):Float; // milliseconds
-	public var volume(get, set):Float;
+	public var attack	(get, set):Float; // milliseconds
+	public var release	(get, set):Float; // milliseconds
+	public var volume	(get, set):Float;
 	
-	public var polyphony(default, null):Int;
+	public var polyphony	(default, null):Int;
+	public var activeTones	(default, null):Map<Int, ToneData>;
+	public var toneEnd		(default, null):Signal<Int->Int->Void>;
+	public var toneBegin	(default, null):Signal<Int->Int->Void>;
 	
-	public var toneEnd	(default, null):Signal<Int->Int->Void>;
-	public var toneBegin(default, null):Signal<Int->Int->Void>;
-		
 	
 	var ID:Int = 0;
 	var _attack:Float;
@@ -73,7 +72,7 @@ class Tones {
 		else destination = destinationNode;
 		
 		polyphony = 0;
-		activeNotes = new Map<Int, Note>();
+		activeTones = new Map<Int, ToneData>();
 		toneBegin = new Signal<Int->Int->Void>();
 		toneEnd = new Signal<Int->Int->Void>();
 		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
@@ -88,28 +87,36 @@ class Tones {
 		attack 	= 10.0;
 		release = 100.0;
 		volume 	= .1;
+		
+		#if debug
+		toneBegin.connect(function(id, poly) {
+			trace('toneBegin | id:$id, polyphony:$poly, time:${context.currentTime}');
+		});		
+		toneEnd.connect(function(id, poly) {
+			trace('toneEnd | id:$id, polyphony:$poly, time:${context.currentTime}');
+		});
+		#end
 	}
 	
 	
 	/**
 	 * Play a frequency
-	 * notes.playFrequency(440); // plays a 440 Hz tone
-	 * notes.playFrequency(440, 1); // plays a 440 Hz tone, in one second
-	 * notes.playFrequency(440, 1, false); // plays a 440 Hz tone, in one second, and doesn't release untill you call releaseNote(noteId)
+	 * tones.playFrequency(440); // plays a 440 Hz tone
+	 * tones.playFrequency(440, 1); // plays a 440 Hz tone, in one second
+	 * tones.playFrequency(440, 1, false); // plays a 440 Hz tone, in one second, and doesn't release untill you call doRelease(toneId)
 	 *
 	 * @param	freq		- A frequency, expressed in Hertz, and above zero. Typically in the audible range 20Hz-20KHz
-	 * @param	delayBy		- A time, in seconds, to delay triggering this note by.
+	 * @param	delayBy		- A time, in seconds, to delay triggering this tone by.
 	 * @param	autoRelease - Release as soon as attack phase ends - default behaviour (true)
-	 * 						  when false the note will play until releaseNote(noteId) is called
+	 * 						  when false the tone will play until doRelease(toneId) is called
 	 * 						- Don't use these behaviours at the same time in one Tones instance 
-	 * @return 	noteId		- The ID assigned to the note being played. Use for releaseNote() when using autoRelease=false
+	 * @return 	toneId		- The ID assigned to the tone being played. Use for doRelease() when using autoRelease=false
 	 */
     public function playFrequency(freq:Float, delayBy:Float = .0, autoRelease:Bool = true):Int {
 	   
 		var id = ID; ID++;
 		
 		var attackSeconds = attack / 1000;
-		
 		var envelope = context.createGain();
 		var triggerTime = now() + delayBy;
 		var releaseTime = triggerTime + attackSeconds;
@@ -122,7 +129,7 @@ class Tones {
 		
 		var osc = context.createOscillator();
 		if (type == OscillatorType.CUSTOM) osc.setPeriodicWave(customWave);
-		else osc.type = cast type; // firefox throws InvalidStateError if setting osc type and using setPeriodicWave 
+		else osc.type = cast type; // firefox throws InvalidStateError if setting osc type and using setPeriodicWave
 		
 		// set freq value before connecting
 		osc.frequency.value = freq;
@@ -130,7 +137,7 @@ class Tones {
 		osc.connect(envelope);
 		osc.start(triggerTime);
 		
-		activeNotes.set(id, { id:id, osc:osc, env:envelope, release:release, attackEnd:triggerTime + attackSeconds } );
+		activeTones.set(id, { id:id, osc:osc, env:envelope, release:release, attackEnd:triggerTime + attackSeconds } );
 		
 		// The tone won't actually begin now if there's a delay set... 
 		// if only there were a way to get a callback or event to fire at a specific audio conext time... Timer.delay will have to do.
@@ -140,22 +147,17 @@ class Tones {
 		
 		if (autoRelease) {
 			envelope.gain.setTargetAtTime(0, releaseTime, getTimeConstant(release / 1000));
-			Timer.delay(stop.bind(id), Math.round(delayBy * 1000 + attack + release));
+			Timer.delay(doStop.bind(id), Math.round(delayBy * 1000 + attack + release));
 		}
 		
 		return id;		
 	}
 	
-	function triggerToneBegin(id:Int):Void {
-		polyphony++;
-		toneBegin.emit(id, polyphony);
-		trace('On | Polyphony:$polyphony, noteId:$id');
-	}
 	
 	/**
-	 * Play a note using the supplied data - could be used for some rough sequencing
+	 * Play a tone using the supplied data - could be used for some rough sequencing
 	 * @param	playData
-	 * @return 	ID - note id
+	 * @return 	ID - tone id
 	 */
     public function play(playData:PlayData):Int {
 		volume 	= playData.volume;
@@ -168,30 +170,30 @@ class Tones {
 	
 	/**
 	 * 
-	 * @param	id
+	 * @param	id - the id of an active tone you want to stop.
 	 */
-	public function releaseNote(id:Int) {
-		var note = getNote(id);
-		if (note == null) return;
+	public function doRelease(id:Int) {
+		var data = getToneData(id);
+		if (data == null) return;
 		
 		var t = now() + releaseFudge;
-		var r = note.release;
+		var r = data.release;
 		
 		// attack phase has not completed, cancel it
-		if (note.attackEnd > now()) note.env.gain.cancelScheduledValues(t);
+		if (data.attackEnd > now()) data.env.gain.cancelScheduledValues(t);
 		
-		note.env.gain.setTargetAtTime(0, t, getTimeConstant(r / 1000));
-		Timer.delay(stop.bind(id), Math.round(r));
+		data.env.gain.setTargetAtTime(0, t, getTimeConstant(r / 1000));
+		Timer.delay(doStop.bind(id), Math.round(r));
 	}
 	
 	
 	public function releaseAll() {
-		for (id in activeNotes.keys()) releaseNote(id);
+		for (id in activeTones.keys()) doRelease(id);
 	}
 	
 	
 	public function stopAll() {
-		for (id in activeNotes.keys()) stop(id);
+		for (id in activeTones.keys()) doStop(id);
 	}
 	
     
@@ -200,31 +202,28 @@ class Tones {
 	 * @param	osc
 	 * @param	env
 	 */
-	public function stop(id:Int) {
-		var note = activeNotes.get(id);
-		if (note == null) return;
+	public function doStop(id:Int) {
+		var data = activeTones.get(id);
+		if (data == null) return;
 		
-		note.osc.stop(now());
-		note.osc.disconnect();
+		data.osc.stop(now());
+		data.osc.disconnect();
 		
-		note.env.gain.cancelScheduledValues(now());
-		note.env.disconnect();
+		data.env.gain.cancelScheduledValues(now());
+		data.env.disconnect();
 		
-		activeNotes.remove(id);
+		activeTones.remove(id);
 		
-		polyphony--;
-		toneEnd.emit(id, polyphony);
-		
-		trace('Off | Polyphony:$polyphony, noteId:$id');
+		triggerToneEnd(id);
 	}
 	
 	
 	/**
-	 * 
+	 * Gets the ToneData for an active tone (osc,env,settings,etc)
 	 * @param	id
-	 * @return	Note
+	 * @return	ToneData
 	 */
-	inline public function getNote(id:Int):Note return activeNotes.get(id);
+	inline public function getToneData(id:Int):ToneData return activeTones.get(id);
 	
 	
 	/**
@@ -255,10 +254,22 @@ class Tones {
 		return _volume = value;
 	}
 	
+	
+	// internal
+	
+	function triggerToneBegin(id:Int):Void {
+		polyphony++;
+		toneBegin.emit(id, polyphony);
+	}
+	
+	function triggerToneEnd(id:Int):Void {
+		polyphony--;
+		toneEnd.emit(id, polyphony);
+	}
 }
 
 
-typedef Note = {
+typedef ToneData = {
 	var id:Int;
 	var osc:OscillatorNode;
 	var env:GainNode;

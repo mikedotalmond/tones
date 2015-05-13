@@ -36,7 +36,7 @@ class CustomWaves {
 		
 		tones = new Tones();
 		tones.volume = .15;
-		tones.attack = 250;
+		tones.attack = 10;
 		tones.release = 500;
 		tones.type = OscillatorType.CUSTOM;
 		
@@ -76,7 +76,7 @@ class CustomWaves {
 					var now = Timer.stamp();
 					var dt = now - lastTime;
 					
-					if (dt > .1) { // limit playback rate a little...
+					if (dt > .05) { // limit playback rate a little...
 						lastTime = now;
 					
 						tones.volume = (e.clientY / Browser.window.innerHeight) * .2;

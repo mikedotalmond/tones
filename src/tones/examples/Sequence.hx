@@ -43,6 +43,7 @@ class Sequence {
 			if (id == lastNoteId) { 
 				// last note was triggered? 
 				// restart the sequence - the last note doubles up with the first in this loop.
+				trace('repeat');
 				playSequence();
 			}
 		});

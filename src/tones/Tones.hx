@@ -1,6 +1,7 @@
 package tones;
 
 import haxe.Timer;
+import hxsignal.Signal;
 import js.Browser;
 
 import js.html.audio.AudioContext;
@@ -46,6 +47,10 @@ class Tones {
 	
 	public var polyphony(default, null):Int;
 	
+	public var toneEnd	(default, null):Signal<Int->Int->Void>;
+	public var toneBegin(default, null):Signal<Int->Int->Void>;
+		
+	
 	var ID:Int = 0;
 	var _attack:Float;
 	var _release:Float;
@@ -69,7 +74,8 @@ class Tones {
 		
 		polyphony = 0;
 		activeNotes = new Map<Int, Note>();
-		
+		toneBegin = new Signal<Int->Int->Void>();
+		toneEnd = new Signal<Int->Int->Void>();
 		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
 		// (apparently about 4096 samples worth of data (1 buffer perhaps?))
 		// If I use context.currentTime the setTargetAtTime will not fade-out, it just ends aruptly.  
@@ -110,6 +116,7 @@ class Tones {
 		
 		envelope.gain.value = 0;
 		envelope.connect(destination);
+		
 		// attack
 		envelope.gain.setTargetAtTime(volume, triggerTime, getTimeConstant(attackSeconds));
 		
@@ -124,17 +131,26 @@ class Tones {
 		osc.start(triggerTime);
 		
 		activeNotes.set(id, { id:id, osc:osc, env:envelope, release:release, attackEnd:triggerTime + attackSeconds } );
-		polyphony++;
+		
+		// The tone won't actually begin now if there's a delay set... 
+		// if only there were a way to get a callback or event to fire at a specific audio conext time... Timer.delay will have to do.
+		var delayMillis = Math.floor(delayBy * 1000);
+		if (delayMillis == 0) triggerToneBegin(id);
+		else Timer.delay(triggerToneBegin.bind(id), delayMillis);
 		
 		if (autoRelease) {
 			envelope.gain.setTargetAtTime(0, releaseTime, getTimeConstant(release / 1000));
 			Timer.delay(stop.bind(id), Math.round(delayBy * 1000 + attack + release));
 		}
 		
-		trace('On  | Polyphony:$polyphony, noteId:$id, freq:$freq, delayBy:$delayBy');
 		return id;		
 	}
 	
+	function triggerToneBegin(id:Int):Void {
+		polyphony++;
+		toneBegin.emit(id, polyphony);
+		trace('On | Polyphony:$polyphony, noteId:$id');
+	}
 	
 	/**
 	 * Play a note using the supplied data - could be used for some rough sequencing
@@ -195,11 +211,14 @@ class Tones {
 		note.env.disconnect();
 		
 		activeNotes.remove(id);
+		
 		polyphony--;
+		toneEnd.emit(id, polyphony);
 		
 		trace('Off | Polyphony:$polyphony, noteId:$id');
 	}
-
+	
+	
 	/**
 	 * 
 	 * @param	id
@@ -235,6 +254,7 @@ class Tones {
 		else if (value > 1) value = 1;
 		return _volume = value;
 	}
+	
 }
 
 

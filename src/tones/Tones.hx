@@ -154,19 +154,6 @@ class Tones {
 	}
 	
 	
-	/**
-	 * Play a tone using the supplied data - could be used for some rough sequencing
-	 * @param	playData
-	 * @return 	ID - tone id
-	 */
-    public function play(playData:PlayData):Int {
-		volume 	= playData.volume;
-		attack 	= playData.attack;
-		release = playData.release;
-		type 	= playData.type;
-		return playFrequency(playData.freq, (playData.delay == null) ? 0 : playData.delay);
-	}
-	
 	
 	/**
 	 * 
@@ -275,13 +262,4 @@ typedef ToneData = {
 	var env:GainNode;
 	var attackEnd:Float;
 	var release:Float;
-}
-
-typedef PlayData = {
-	var volume:Float;
-	var attack:Float;
-	var release:Float;
-	var type:OscillatorType;
-	var freq:Float;
-	@:optional var delay:Float;
 }

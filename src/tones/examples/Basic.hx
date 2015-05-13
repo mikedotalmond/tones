@@ -29,12 +29,5 @@ class Basic {
 		var freqUtil = new NoteFrequencyUtil();
 		tones.playFrequency(freqUtil.noteNameToFrequency('C3'));
 		
-		tones.play({
-			freq	:280,
-			volume	:.1, 
-			attack	:250, 
-			release	:250, 
-			type	:OscillatorType.SAWTOOTH,
-		});
 	}	
 }

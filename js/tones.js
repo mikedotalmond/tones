@@ -107,6 +107,9 @@ Main.main = function() {
 	case "?sequence":
 		var sequence = new tones_examples_Sequence();
 		break;
+	case "?randomSequence":
+		var randomSequence = new tones_examples_RandomSequence();
+		break;
 	case "?polysynth":
 		var polysynth = new tones_examples_KeyboardControlled();
 		break;
@@ -864,13 +867,6 @@ tones_Tones.prototype = {
 		}
 		return id;
 	}
-	,play: function(playData) {
-		this.set_volume(playData.volume);
-		this.set_attack(playData.attack);
-		this.set_release(playData.release);
-		this.type = playData.type;
-		return this.playFrequency(playData.freq,playData.delay == null?0:playData.delay);
-	}
 	,doRelease: function(id) {
 		var data = this.activeTones.h[id];
 		if(data == null) return;
@@ -931,8 +927,7 @@ var tones_examples_Basic = function() {
 	this.tones.set_volume(.05);
 	this.tones.set_attack(500);
 	var freqUtil = new tones_utils_NoteFrequencyUtil();
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("C3"));
-	this.tones.play({ freq : 280, volume : .1, attack : 250, release : 250, type : window.OscillatorTypeShim.SAWTOOTH});
+	this.tones.playFrequency(freqUtil.noteNameToFrequency("G3"),1);
 };
 tones_examples_Basic.__name__ = true;
 tones_examples_Basic.prototype = {
@@ -1272,40 +1267,108 @@ tones_examples_KeyboardControlled.prototype = {
 	}
 	,__class__: tones_examples_KeyboardControlled
 };
+var tones_examples_RandomSequence = function() {
+	this.tones = new tones_Tones();
+	this.tones.type = window.OscillatorTypeShim.SQUARE;
+	this.tones.toneBegin.connect($bind(this,this.onToneBegin));
+	this.tones.toneEnd.connect($bind(this,this.onToneEnd));
+	this.playRandom();
+};
+tones_examples_RandomSequence.__name__ = true;
+tones_examples_RandomSequence.prototype = {
+	playRandom: function() {
+		this.tones.set_volume(.001 + Math.random() * .04);
+		this.tones.set_attack(Math.random() * Math.random() * 250);
+		this.tones.set_release(10 + Math.random() * Math.random() * 500);
+		var freq = 50 + Math.random() * 600;
+		var delay = Math.random();
+		this.tones.playFrequency(freq,delay);
+	}
+	,onToneBegin: function(id,polyphony) {
+		if(polyphony < 3) this.playRandom();
+	}
+	,onToneEnd: function(id,polyphony) {
+		if(polyphony < 3) this.playRandom();
+	}
+	,__class__: tones_examples_RandomSequence
+};
 var tones_examples_ReleaseLater = function() {
 	var tones2 = new tones_Tones();
-	tones2.type = window.OscillatorTypeShim.SAWTOOTH;
-	tones2.set_volume(.2);
+	tones2.type = window.OscillatorTypeShim.SQUARE;
+	tones2.set_volume(.05);
 	tones2.set_attack(200);
 	tones2.set_release(2500);
-	var noteId = tones2.playFrequency(540,.1,false);
+	var noteId1 = tones2.playFrequency(220,.1,false);
+	tones2.set_volume(.03);
+	tones2.type = window.OscillatorTypeShim.SAWTOOTH;
+	var noteId2 = tones2.playFrequency(111,.1001,false);
 	haxe_Timer.delay(function() {
-		tones2.doRelease(noteId);
-	},2500);
+		tones2.doRelease(noteId1);
+		tones2.doRelease(noteId2);
+	},2250);
 };
 tones_examples_ReleaseLater.__name__ = true;
 tones_examples_ReleaseLater.prototype = {
 	__class__: tones_examples_ReleaseLater
 };
 var tones_examples_Sequence = function() {
+	var _g = this;
 	this.tones = new tones_Tones();
 	this.tones.set_volume(.1);
 	this.tones.set_attack(25);
 	this.tones.set_release(1000);
 	this.tones.type = window.OscillatorTypeShim.SAWTOOTH;
-	var freqUtil = new tones_utils_NoteFrequencyUtil();
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("C3"),0);
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("C4"),.2);
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("C5"),.4);
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("G3"),.8);
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("G4"),1);
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("G5"),1.2);
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("G2"),1);
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("G1"),1.2);
+	this.freqUtil = new tones_utils_NoteFrequencyUtil();
+	this.lastNoteId = -1;
+	this.tones.toneEnd.connect(function(id,poly) {
+		var tmp;
+		var x = Math.random() * 12;
+		tmp = x | 0;
+		var r = 2 + tmp;
+		if(poly == r) {
+			_g.tones.set_volume(.05);
+			var tmp1;
+			var x1 = Math.random() * 3;
+			tmp1 = x1 | 0;
+			var octave = 1 + tmp1;
+			var tmp2;
+			var x2 = Math.random() * 12;
+			tmp2 = x2 | 0;
+			var note = tones_utils_NoteFrequencyUtil.pitchNames[tmp2];
+			_g.tones.playFrequency(_g.freqUtil.noteNameToFrequency("" + note + octave),.1);
+		}
+	});
+	this.tones.toneBegin.connect(function(id1,poly1) {
+		if(id1 == _g.lastNoteId) {
+			console.log("repeat");
+			_g.playSequence();
+		}
+	});
+	this.playSequence();
 };
 tones_examples_Sequence.__name__ = true;
 tones_examples_Sequence.prototype = {
-	__class__: tones_examples_Sequence
+	playSequence: function() {
+		this.tones.set_volume(.05);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C3"),0);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C4"),.2);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C5"),.4);
+		var _g = this.tones;
+		_g.set_volume(_g._volume * .9);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G3"),.8);
+		var _g1 = this.tones;
+		_g1.set_volume(_g1._volume * .8);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G4"),1);
+		var _g2 = this.tones;
+		_g2.set_volume(_g2._volume * .7);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G5"),1.2);
+		this.tones.set_volume(.08);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G2"),1);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G1"),1.2);
+		this.tones.set_volume(.05);
+		this.lastNoteId = this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C1"),1.4);
+	}
+	,__class__: tones_examples_Sequence
 };
 var tones_examples_SharedContext = function() {
 	this.context = tones_Tones.createContext();
@@ -1754,3 +1817,5 @@ js_Boot.__toStr = {}.toString;
 tones_utils_Wavetables.FileNames = ["Bass.json","Bass_Amp360.json","Bass_Fuzz.json","Bass_Fuzz_2.json","Bass_Sub_Dub.json","Bass_Sub_Dub_2.json","Brass.json","Brit_Blues.json","Brit_Blues_Driven.json","Buzzy_1.json","Buzzy_2.json","Celeste.json","Chorus_Strings.json","Dissonant_1.json","Dissonant_2.json","Dissonant_Piano.json","Dropped_Saw.json","Dropped_Square.json","Dyna_EP_Bright.json","Dyna_EP_Med.json","Ethnic_33.json","Full_1.json","Full_2.json","Guitar_Fuzz.json","Harsh.json","Mkl_Hard.json","Noise.json","Organ_2.json","Organ_3.json","Phoneme_ah.json","Phoneme_bah.json","Phoneme_ee.json","Phoneme_o.json","Phoneme_ooh.json","Phoneme_pop_ahhhs.json","Piano.json","Putney_Wavering.json","TB303_Square.json","Throaty.json","Trombone.json","TwelveStringGuitar.json","Twelve_OpTines.json","Warm_Saw.json","Warm_Square.json","Warm_Triangle.json","Wurlitzer.json","Wurlitzer_2.json"];
 Main.main();
 })(typeof console != "undefined" ? console : {log:function(){}});
+
+//# sourceMappingURL=tones.js.map

@@ -29,6 +29,12 @@ class Main {
 				/** load and use wavetable data **/
 				var customWaves = new CustomWaves();
 		
+			case "?freqSlide":
+				/** Controlling the frequency of a single tone.
+				 * Uses the tone begin + release Signals, and access to the ToneData 
+				 * to slide randomly from one frequency to another.**/
+				var freqSlide = new FreqSlide();
+				
 			case "?sequence":
 				/** a sequencing example **/
 				var sequence = new Sequence();

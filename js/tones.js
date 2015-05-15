@@ -822,8 +822,11 @@ var tones_Tones = function(audioContext,destinationNode) {
 	this.toneBegin.connect(function(id,poly) {
 		console.log("toneBegin | id:" + id + ", polyphony:" + poly + ", time:" + _g.context.currentTime);
 	});
-	this.toneEnd.connect(function(id1,poly1) {
-		console.log("toneEnd | id:" + id1 + ", polyphony:" + poly1 + ", time:" + _g.context.currentTime);
+	this.toneReleased.connect(function(id1) {
+		console.log("toneReleased | id:" + id1 + ", time:" + _g.context.currentTime);
+	});
+	this.toneEnd.connect(function(id2,poly1) {
+		console.log("toneEnd | id:" + id2 + ", polyphony:" + poly1 + ", time:" + _g.context.currentTime);
 	});
 };
 tones_Tones.__name__ = true;

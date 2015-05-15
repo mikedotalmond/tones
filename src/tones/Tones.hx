@@ -94,6 +94,9 @@ class Tones {
 		toneBegin.connect(function(id, poly) {
 			trace('toneBegin | id:$id, polyphony:$poly, time:${now()}');
 		});		
+		toneReleased.connect(function(id) {
+			trace('toneReleased | id:$id, time:${now()}');
+		});
 		toneEnd.connect(function(id, poly) {
 			trace('toneEnd | id:$id, polyphony:$poly, time:${now()}');
 		});

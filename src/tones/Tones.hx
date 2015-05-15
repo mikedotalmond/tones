@@ -92,10 +92,10 @@ class Tones {
 		
 		#if debug
 		toneBegin.connect(function(id, poly) {
-			trace('toneBegin | id:$id, polyphony:$poly, time:${context.currentTime}');
+			trace('toneBegin | id:$id, polyphony:$poly, time:${now()}');
 		});		
 		toneEnd.connect(function(id, poly) {
-			trace('toneEnd | id:$id, polyphony:$poly, time:${context.currentTime}');
+			trace('toneEnd | id:$id, polyphony:$poly, time:${now()}');
 		});
 		#end
 	}
@@ -159,7 +159,7 @@ class Tones {
 	 * @param	delay - in seconds, relative to the current context time
 	 */
 	public function releaseAfter(id:Int, delay:Float) {
-		doRelease(id, context.currentTime + delay);
+		doRelease(id, now() + delay);
 	}
 	
 	

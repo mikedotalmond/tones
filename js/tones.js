@@ -104,6 +104,9 @@ Main.main = function() {
 	case "?customWaves":
 		var customWaves = new tones_examples_CustomWaves();
 		break;
+	case "?freqSlide":
+		var freqSlide = new tones_examples_FreqSlide();
+		break;
 	case "?sequence":
 		var sequence = new tones_examples_Sequence();
 		break;
@@ -808,6 +811,7 @@ var tones_Tones = function(audioContext,destinationNode) {
 	if(destinationNode == null) this.destination = this.context.destination; else this.destination = destinationNode;
 	this.polyphony = 0;
 	this.activeTones = new haxe_ds_IntMap();
+	this.toneReleased = new hxsignal_impl_Signal1();
 	this.toneBegin = new hxsignal_impl_Signal2();
 	this.toneEnd = new hxsignal_impl_Signal2();
 	this.releaseFudge = window.navigator.userAgent.indexOf("Firefox") > -1?4096 / this.context.sampleRate:0;
@@ -844,8 +848,8 @@ tones_Tones.prototype = {
 		osc.frequency.value = freq;
 		osc.connect(envelope);
 		osc.start(triggerTime);
-		this.activeTones.h[id] = { id : id, osc : osc, env : envelope, release : this._release, attackEnd : triggerTime + attackSeconds};
 		var delayMillis = Math.floor(delayBy * 1000);
+		this.activeTones.h[id] = { id : id, osc : osc, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
 		if(delayMillis == 0) this.triggerToneBegin(id); else {
 			var tmp;
 			var f = $bind(this,this.triggerToneBegin);
@@ -855,38 +859,47 @@ tones_Tones.prototype = {
 			};
 			haxe_Timer.delay(tmp,delayMillis);
 		}
-		if(autoRelease) {
-			envelope.gain.setTargetAtTime(0,releaseTime,Math.log(this._release / 1000 + 1.0) / 4.605170185988092);
-			var tmp1;
-			var f1 = $bind(this,this.doStop);
-			var id2 = id;
-			tmp1 = function() {
-				f1(id2);
-			};
-			haxe_Timer.delay(tmp1,Math.round(delayBy * 1000 + this._attack + this._release));
-		}
+		if(autoRelease) this.doRelease(id,releaseTime);
 		return id;
 	}
-	,doRelease: function(id) {
+	,releaseAfter: function(id,delay) {
+		this.doRelease(id,this.context.currentTime + delay);
+	}
+	,doRelease: function(id,atTime) {
+		if(atTime == null) atTime = -1;
 		var data = this.activeTones.h[id];
 		if(data == null) return;
-		var t = this.context.currentTime + this.releaseFudge;
-		var r = data.release;
-		if(data.attackEnd > this.context.currentTime) data.env.gain.cancelScheduledValues(t);
-		data.env.gain.setTargetAtTime(0,t,Math.log(r / 1000 + 1.0) / 4.605170185988092);
+		var time;
+		var nowTime = this.context.currentTime;
+		if(atTime < nowTime) time = nowTime; else time = atTime;
+		time += this.releaseFudge;
+		var dt = time - nowTime;
+		var dtMillis = Math.round(dt * 1000);
+		if(dtMillis > 0) {
+			var tmp1;
+			var f = ($_=this.toneReleased,$bind($_,$_.emit));
+			var p1 = id;
+			tmp1 = function() {
+				f(p1);
+			};
+			haxe_Timer.delay(tmp1,dtMillis);
+		} else this.toneReleased.emit(id);
+		data.env.gain.cancelScheduledValues(time);
+		data.env.gain.setTargetAtTime(0,time,Math.log(data.release / 1000 + 1.0) / 4.605170185988092);
 		var tmp;
-		var f = $bind(this,this.doStop);
+		var f1 = $bind(this,this.doStop);
 		var id1 = id;
 		tmp = function() {
-			f(id1);
+			f1(id1);
 		};
-		haxe_Timer.delay(tmp,Math.round(r));
+		haxe_Timer.delay(tmp,Math.round(dtMillis + data.release));
 	}
-	,releaseAll: function() {
+	,releaseAll: function(atTime) {
+		if(atTime == null) atTime = -1;
 		var $it0 = this.activeTones.keys();
 		while( $it0.hasNext() ) {
 			var id = $it0.next();
-			this.doRelease(id);
+			this.doRelease(id,atTime);
 		}
 	}
 	,doStop: function(id) {
@@ -896,8 +909,8 @@ tones_Tones.prototype = {
 		data.osc.disconnect();
 		data.env.gain.cancelScheduledValues(this.context.currentTime);
 		data.env.disconnect();
-		this.activeTones.remove(id);
 		this.triggerToneEnd(id);
+		this.activeTones.remove(id);
 	}
 	,set_attack: function(value) {
 		if(value < 1) value = 1;
@@ -1004,6 +1017,29 @@ tones_examples_CustomWaves.prototype = {
 		}
 	}
 	,__class__: tones_examples_CustomWaves
+};
+var tones_examples_FreqSlide = function() {
+	this.tones = new tones_Tones();
+	this.tones.toneBegin.connect($bind(this,this.onToneStart));
+	this.tones.toneReleased.connect($bind(this,this.onToneReleased));
+	this.tones.type = window.OscillatorTypeShim.SQUARE;
+	this.tones.set_volume(.04);
+	this.tones.set_attack(200);
+	this.tones.set_release(400);
+	this.tones.playFrequency(220,.5,false);
+};
+tones_examples_FreqSlide.__name__ = true;
+tones_examples_FreqSlide.prototype = {
+	onToneStart: function(id,poly) {
+		var data = this.tones.activeTones.h[id];
+		data.osc.frequency.setTargetAtTime(20 + 420 * Math.random(),this.tones.context.currentTime,Math.log(2.) / 4.605170185988092);
+		this.tones.releaseAfter(id,1);
+	}
+	,onToneReleased: function(id) {
+		var data = this.tones.activeTones.h[id];
+		this.tones.playFrequency(data.osc.frequency.value,0,false);
+	}
+	,__class__: tones_examples_FreqSlide
 };
 var tones_examples_KeyboardControlled = function() {
 	var tmp;

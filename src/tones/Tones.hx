@@ -270,13 +270,3 @@ class Tones {
 		toneEnd.emit(id, polyphony);
 	}
 }
-
-
-typedef ToneData = {
-	var id:Int;
-	var osc:OscillatorNode;
-	var env:GainNode;
-	var triggerTime:Float;
-	var attack:Float;
-	var release:Float;
-}

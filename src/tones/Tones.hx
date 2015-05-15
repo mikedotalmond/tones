@@ -23,9 +23,9 @@ import js.html.audio.PeriodicWave;
 
 class Tones {
   
-	static inline var TimeConstDivider = 4.605170185988092; // Math.log(100);
-	static inline function getTimeConstant(time:Float) return Math.log(time + 1.0) / TimeConstDivider;
-	static inline function rExp(v) return 1.0 - 1.0 / Math.exp(v);
+	static public inline var TimeConstDivider = 4.605170185988092; // Math.log(100);
+	static public inline function getTimeConstant(time:Float) return Math.log(time + 1.0) / TimeConstDivider;
+	
 	static inline function isFirefox() return Browser.navigator.userAgent.indexOf('Firefox') > -1;
 	
 	public static function createContext():AudioContext {
@@ -46,8 +46,9 @@ class Tones {
 	
 	public var polyphony	(default, null):Int;
 	public var activeTones	(default, null):Map<Int, ToneData>;
-	public var toneEnd		(default, null):Signal<Int->Int->Void>;
 	public var toneBegin	(default, null):Signal<Int->Int->Void>;
+	public var toneEnd		(default, null):Signal<Int->Int->Void>;
+	public var toneReleased	(default, null):Signal<Int->Void>;
 	
 	
 	var ID:Int = 0;
@@ -73,6 +74,7 @@ class Tones {
 		
 		polyphony = 0;
 		activeTones = new Map<Int, ToneData>();
+		toneReleased = new Signal<Int->Void>();
 		toneBegin = new Signal<Int->Int->Void>();
 		toneEnd = new Signal<Int->Int->Void>();
 		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
@@ -137,45 +139,60 @@ class Tones {
 		osc.connect(envelope);
 		osc.start(triggerTime);
 		
-		activeTones.set(id, { id:id, osc:osc, env:envelope, release:release, attackEnd:triggerTime + attackSeconds } );
+		var delayMillis = Math.floor(delayBy * 1000);
+		
+		activeTones.set(id, { id:id, osc:osc, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 		
 		// The tone won't actually begin now if there's a delay set... 
 		// if only there were a way to get a callback or event to fire at a specific audio conext time... Timer.delay will have to do.
-		var delayMillis = Math.floor(delayBy * 1000);
 		if (delayMillis == 0) triggerToneBegin(id);
 		else Timer.delay(triggerToneBegin.bind(id), delayMillis);
 		
-		if (autoRelease) {
-			envelope.gain.setTargetAtTime(0, releaseTime, getTimeConstant(release / 1000));
-			Timer.delay(doStop.bind(id), Math.round(delayBy * 1000 + attack + release));
-		}
+		if (autoRelease) doRelease(id, releaseTime);
 		
 		return id;		
 	}
 	
+	/**
+	 * 
+	 * @param	id - tone id
+	 * @param	delay - in seconds, relative to the current context time
+	 */
+	public function releaseAfter(id:Int, delay:Float) {
+		doRelease(id, context.currentTime + delay);
+	}
 	
 	
 	/**
 	 * 
-	 * @param	id - the id of an active tone you want to stop.
+	 * @param	id - tone id
+	 * @param	atTime - the context time to release at. Don't pass anything and release begins immediately.
 	 */
-	public function doRelease(id:Int) {
+	public function doRelease(id:Int, atTime:Float=-1) {
 		var data = getToneData(id);
 		if (data == null) return;
 		
-		var t = now() + releaseFudge;
-		var r = data.release;
+		var time;
+		var nowTime = now();
 		
-		// attack phase has not completed, cancel it
-		if (data.attackEnd > now()) data.env.gain.cancelScheduledValues(t);
+		if (atTime < nowTime) time = nowTime;
+		else time = atTime;
 		
-		data.env.gain.setTargetAtTime(0, t, getTimeConstant(r / 1000));
-		Timer.delay(doStop.bind(id), Math.round(r));
+		time += releaseFudge;
+		var dt = time - nowTime;
+		var dtMillis = Math.round(dt * 1000);
+		
+		if (dtMillis > 0) Timer.delay(toneReleased.emit.bind(id), dtMillis);
+		else toneReleased.emit(id);
+		
+		data.env.gain.cancelScheduledValues(time);
+		data.env.gain.setTargetAtTime(0, time, getTimeConstant(data.release / 1000));
+		Timer.delay(doStop.bind(id), Math.round(dtMillis + data.release));
 	}
 	
 	
-	public function releaseAll() {
-		for (id in activeTones.keys()) doRelease(id);
+	public function releaseAll(atTime:Float = -1) {
+		for (id in activeTones.keys()) doRelease(id, atTime);
 	}
 	
 	
@@ -199,9 +216,9 @@ class Tones {
 		data.env.gain.cancelScheduledValues(now());
 		data.env.disconnect();
 		
-		activeTones.remove(id);
-		
 		triggerToneEnd(id);
+		
+		activeTones.remove(id);
 	}
 	
 	
@@ -243,7 +260,6 @@ class Tones {
 	
 	
 	// internal
-	
 	function triggerToneBegin(id:Int):Void {
 		polyphony++;
 		toneBegin.emit(id, polyphony);
@@ -260,6 +276,7 @@ typedef ToneData = {
 	var id:Int;
 	var osc:OscillatorNode;
 	var env:GainNode;
-	var attackEnd:Float;
+	var triggerTime:Float;
+	var attack:Float;
 	var release:Float;
 }

@@ -1,6 +1,5 @@
 package tones.examples;
 
-import haxe.Constraints.FlatEnum;
 import js.html.audio.OscillatorNode;
 import js.html.Float32Array;
 import js.Browser;
@@ -44,6 +43,14 @@ class LorenzTones {
 		tones.playFrequency(80, .5, false);
 	}
 	
+	function onToneStart(id, poly) {
+		if (poly == 3) {
+			osc1 = tones.getToneData(0).osc;
+			osc2 = tones.getToneData(1).osc;
+			osc3 = tones.getToneData(2).osc;
+			Browser.window.requestAnimationFrame(enterFrame);
+		}
+	}
 	
 	function enterFrame(time:Float) {
 		Browser.window.requestAnimationFrame(enterFrame);
@@ -84,16 +91,6 @@ class LorenzTones {
 		osc1.frequency.setTargetAtTime(20 + x * 440, now, tc);
 		osc2.frequency.setTargetAtTime(20 + y * 440, now, tc);
 		osc3.frequency.setTargetAtTime(20 + z * 440, now, tc);
-	}
-	
-	
-	function onToneStart(id, poly) {
-		if (poly == 3) {
-			osc1 = tones.getToneData(0).osc;
-			osc2 = tones.getToneData(1).osc;
-			osc3 = tones.getToneData(2).osc;
-			Browser.window.requestAnimationFrame(enterFrame);
-		}
 	}
 }
 

@@ -113,6 +113,9 @@ Main.main = function() {
 	case "?randomSequence":
 		var randomSequence = new tones_examples_RandomSequence();
 		break;
+	case "?lorenzTones":
+		var lorenzTones = new tones_examples_LorenzTones();
+		break;
 	case "?polysynth":
 		var polysynth = new tones_examples_KeyboardControlled();
 		break;
@@ -1305,6 +1308,80 @@ tones_examples_KeyboardControlled.prototype = {
 		console.log("note off:" + (index >= 0 && index < 128?this.keyboardNotes.noteFreq.noteNames[index]:null));
 	}
 	,__class__: tones_examples_KeyboardControlled
+};
+var tones_examples_LorenzTones = function() {
+	this.lastTime = 0;
+	this.lorenz = new tones_examples_Lorenz();
+	this.minMax = new Float32Array([Infinity,-Infinity,Infinity,-Infinity,Infinity,-Infinity]);
+	this.tones = new tones_Tones();
+	this.tones.toneBegin.connect($bind(this,this.onToneStart));
+	this.tones.type = window.OscillatorTypeShim.SQUARE;
+	this.tones.set_volume(.025);
+	this.tones.set_attack(250);
+	this.tones.playFrequency(20,.5,false);
+	this.tones.playFrequency(40,.5,false);
+	this.tones.playFrequency(80,.5,false);
+};
+tones_examples_LorenzTones.__name__ = true;
+tones_examples_LorenzTones.prototype = {
+	enterFrame: function(time) {
+		window.requestAnimationFrame($bind(this,this.enterFrame));
+		var dt = time - this.lastTime;
+		this.lastTime = time;
+		if(dt == 0) return;
+		var dtSecs = dt / 1000;
+		this.lorenz.step(0.0083333333333333332);
+		var lx = this.lorenz.x;
+		var ly = this.lorenz.y;
+		var lz = this.lorenz.z;
+		this.minMax[0] = Math.min(this.minMax[0],lx);
+		this.minMax[1] = Math.max(this.minMax[1],lx);
+		this.minMax[2] = Math.min(this.minMax[2],ly);
+		this.minMax[3] = Math.max(this.minMax[3],ly);
+		this.minMax[4] = Math.min(this.minMax[4],lz);
+		this.minMax[5] = Math.max(this.minMax[5],lz);
+		var x = (lx - this.minMax[0]) / (this.minMax[1] - this.minMax[0]);
+		var y = (ly - this.minMax[2]) / (this.minMax[3] - this.minMax[2]);
+		var z = (lz - this.minMax[4]) / (this.minMax[5] - this.minMax[4]);
+		if(x < 0 || isNaN(x)) x = 0;
+		if(y < 0) y = 0;
+		if(z < 0 || !isFinite(z)) z = 0;
+		var now = this.tones.context.currentTime;
+		this.osc1.frequency.cancelScheduledValues(now);
+		this.osc2.frequency.cancelScheduledValues(now);
+		this.osc3.frequency.cancelScheduledValues(now);
+		var tc = Math.log(dtSecs + 1.0) / 4.605170185988092;
+		this.osc1.frequency.setTargetAtTime(20 + x * 440,now,tc);
+		this.osc2.frequency.setTargetAtTime(20 + y * 440,now,tc);
+		this.osc3.frequency.setTargetAtTime(20 + z * 440,now,tc);
+	}
+	,onToneStart: function(id,poly) {
+		if(poly == 3) {
+			this.osc1 = this.tones.activeTones.h[0].osc;
+			this.osc2 = this.tones.activeTones.h[1].osc;
+			this.osc3 = this.tones.activeTones.h[2].osc;
+			window.requestAnimationFrame($bind(this,this.enterFrame));
+		}
+	}
+	,__class__: tones_examples_LorenzTones
+};
+var tones_examples_Lorenz = function() {
+	this.sigma = 10.0;
+	this.rho = 28.0;
+	this.beta = 2.6666666666666665;
+	this.x = 1;
+	this.y = 1;
+	this.z = 1;
+};
+tones_examples_Lorenz.__name__ = true;
+tones_examples_Lorenz.prototype = {
+	step: function(dt) {
+		if(dt == null) dt = 0.0083333333333333332;
+		this.x = this.x + dt * (this.sigma * (this.y - this.x));
+		this.y = this.y + dt * (this.x * (this.rho - this.z) - this.y);
+		this.z = this.z + dt * (this.x * this.y - this.beta * this.z);
+	}
+	,__class__: tones_examples_Lorenz
 };
 var tones_examples_RandomSequence = function() {
 	this.tones = new tones_Tones();

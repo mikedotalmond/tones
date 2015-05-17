@@ -84,7 +84,7 @@ class KeyboardControlled {
 	
 	function setupUI() {
 		
-        gui = new GUI();
+        gui = new GUI({autoPlace:false});
 		
 		gui.add({ volume:.5 }, 'volume', 0, 1).step(1 / 256).onChange(function(_) { outGain.gain.setValueAtTime(_, context.currentTime + .1); } );
 		gui.add(keyboardInput, 'octaveShift', -1, 3).step(1).onChange(releaseAll);
@@ -123,6 +123,7 @@ class KeyboardControlled {
 		folder2.add( { 'attack': randomise.bind(1,'attack') }, 'attack');
 		folder2.add( { 'release': randomise.bind(1,'release') }, 'release');
 		
+		Browser.document.body.appendChild(gui.domElement);
 	}
 	
 	function releaseAll() {

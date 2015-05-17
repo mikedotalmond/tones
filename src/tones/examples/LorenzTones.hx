@@ -1,5 +1,7 @@
 package tones.examples;
 
+import dat.gui.GUI;
+import js.html.audio.GainNode;
 import js.html.audio.OscillatorNode;
 import js.html.Float32Array;
 import js.Browser;
@@ -16,12 +18,21 @@ class LorenzTones {
 	var minMax:Float32Array;
 	
 	var lastTime:Float =0;
+	var masterGain:GainNode;
 	var osc1:OscillatorNode;
 	var osc2:OscillatorNode;
 	var osc3:OscillatorNode;
+	var speed:Int;
+	var gui:GUI;
+	
+	var freqLow:Float;
+	var freqHigh:Float;
 	
 	public function new() {
 		
+		speed = 16;
+		freqLow = 80;
+		freqHigh = 220;
 		lorenz = new Lorenz();
 		minMax = new Float32Array([
 			Math.POSITIVE_INFINITY, Math.NEGATIVE_INFINITY, //x
@@ -29,18 +40,25 @@ class LorenzTones {
 			Math.POSITIVE_INFINITY, Math.NEGATIVE_INFINITY, //z
 		]);
 	
-		tones = new Tones(); // create 
+		var c = Tones.createContext();
 		
+		masterGain = c.createGain();
+		masterGain.gain.value = .75;
+		masterGain.connect(c.destination);
+		
+		tones = new Tones(c, masterGain); 
 		tones.toneBegin.connect(onToneStart);
 		
 		// change some settings...
-		tones.type = OscillatorType.SQUARE;
-		tones.volume = .025;
+		tones.type = OscillatorType.TRIANGLE;
+		tones.volume = .2;
 		tones.attack = 250;
 		
-		tones.playFrequency(20, .5, false);
 		tones.playFrequency(40, .5, false);
-		tones.playFrequency(80, .5, false);
+		tones.playFrequency(40, .5, false);
+		tones.playFrequency(40, .5, false);
+		
+		setupUI();
 	}
 	
 	function onToneStart(id, poly) {
@@ -60,9 +78,8 @@ class LorenzTones {
 		
 		if (dt == 0) return;
 		
-		var dtSecs = dt / 1000;
+		for(i in 0...speed) lorenz.step(1 / 1280);
 		
-		lorenz.step(1 / 120);
 		
 		var lx = lorenz.x; var ly = lorenz.y; var lz = lorenz.z;
 		minMax[0] = Math.min(minMax[0], lx);
@@ -76,8 +93,8 @@ class LorenzTones {
 		var y = (ly - minMax[2]) / (minMax[3] - minMax[2]);
 		var z = (lz - minMax[4]) / (minMax[5] - minMax[4]);
 		
-		if (x < 0 || Math.isNaN(x)) x = 0; // clamp for rounding errors
-		if (y < 0) y = 0;
+		if (x < 0 || Math.isNaN(x)) x = 0; 
+		if (y < 0 || Math.isNaN(y)) y = 0;
 		if (z < 0 || !Math.isFinite(z)) z = 0;
 		
 		//trace('$x,$y,$z');
@@ -86,11 +103,21 @@ class LorenzTones {
 		osc2.frequency.cancelScheduledValues(now);
 		osc3.frequency.cancelScheduledValues(now);
 		
-		var tc = Tones.getTimeConstant(dtSecs);
-		
-		osc1.frequency.setTargetAtTime(20 + x * 440, now, tc);
-		osc2.frequency.setTargetAtTime(20 + y * 440, now, tc);
-		osc3.frequency.setTargetAtTime(20 + z * 440, now, tc);
+		var range = (freqHigh - freqLow);
+		var tc = Tones.getTimeConstant(dt / 1000);
+		osc1.frequency.setTargetAtTime(freqLow + x * range, now, tc);
+		osc2.frequency.setTargetAtTime(freqLow + y * range, now, tc);
+		osc3.frequency.setTargetAtTime(freqLow + z * range, now, tc);
+	}
+	
+	
+	function setupUI() {
+		gui = new GUI({autoPlace:false});
+		gui.add({ volume: masterGain.gain.value }, 'volume', 0, 1).step(1 / 256).onChange(function(_) { masterGain.gain.setValueAtTime(_, tones.context.currentTime + .1); } );
+		gui.add(this, 'speed', 1, 128).step(1);
+		gui.add(this, 'freqLow', 20, 440);
+		gui.add(this, 'freqHigh', 20, 440);
+		Browser.document.body.appendChild(gui.domElement);
 	}
 }
 
@@ -105,22 +132,31 @@ class Lorenz {
     public var rho:Float;
     public var beta:Float;
 	
-	public var x(default, null):Float;
-	public var y(default, null):Float;
-	public var z(default, null):Float;
+	public var x(get, never):Float;
+	inline function get_x() return xyz[0];
+	
+	public var y(get, never):Float;
+	inline function get_y() return xyz[1];
+	
+	public var z(get, never):Float;
+	inline function get_z() return xyz[2];
+	
+	var xyz:Float32Array;
 	
 	public function new() {
-		sigma = 10.0;
-		rho = 28.0;
-		beta = 8 / 3;
-		
-		x = 1; y = 1; z = 1;
+		sigma 	= 10.0;
+		rho 	= 28.0;
+		beta 	= 8 / 3;
+		xyz 	= new Float32Array([1.0, 1.0, 1.0]);
 	}
 	
-	//https://dl.dropboxusercontent.com/u/7851949/lorenz-attractor/index.html
+	public function reset() {
+		xyz[0] = 1.0; xyz[1] = 1.0; xyz[2] = 1.0;
+	}
+	
 	public function step(dt:Float=1/120) {
-		x = x + dt * (sigma * (y - x));
-		y = y + dt * (x * (rho - z) - y);
-		z = z + dt * (x * y - beta * z);
+		xyz[0] = xyz[0] + dt * (sigma * (xyz[1] - xyz[0]));
+		xyz[1] = xyz[1] + dt * (xyz[0] * (rho - z) - xyz[1]);
+		xyz[2] = xyz[2] + dt * (xyz[0] * xyz[1] - beta * xyz[2]);
 	}
 }

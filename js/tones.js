@@ -1092,7 +1092,7 @@ tones_examples_KeyboardControlled.prototype = {
 	}
 	,setupUI: function() {
 		var _g = this;
-		this.gui = new dat.gui.GUI();
+		this.gui = new dat.gui.GUI({ autoPlace : false});
 		this.gui.add({ volume : .5},"volume",0,1).step(0.00390625).onChange(function(_) {
 			_g.outGain.gain.setValueAtTime(_,_g.context.currentTime + .1);
 		});
@@ -1191,6 +1191,7 @@ tones_examples_KeyboardControlled.prototype = {
 			f12(1,"release");
 		};
 		folder2.add({ 'release' : tmp12},"release");
+		window.document.body.appendChild(this.gui.domElement);
 	}
 	,releaseAll: function() {
 		this.tonesA.releaseAll();
@@ -1311,29 +1312,49 @@ tones_examples_KeyboardControlled.prototype = {
 };
 var tones_examples_LorenzTones = function() {
 	this.lastTime = 0;
+	this.speed = 16;
+	this.freqLow = 80;
+	this.freqHigh = 220;
 	this.lorenz = new tones_examples_Lorenz();
 	this.minMax = new Float32Array([Infinity,-Infinity,Infinity,-Infinity,Infinity,-Infinity]);
-	this.tones = new tones_Tones();
+	var c = tones_Tones.createContext();
+	this.masterGain = c.createGain();
+	this.masterGain.gain.value = .75;
+	this.masterGain.connect(c.destination);
+	this.tones = new tones_Tones(c,this.masterGain);
 	this.tones.toneBegin.connect($bind(this,this.onToneStart));
-	this.tones.type = window.OscillatorTypeShim.SQUARE;
-	this.tones.set_volume(.025);
+	this.tones.type = window.OscillatorTypeShim.TRIANGLE;
+	this.tones.set_volume(.2);
 	this.tones.set_attack(250);
-	this.tones.playFrequency(20,.5,false);
 	this.tones.playFrequency(40,.5,false);
-	this.tones.playFrequency(80,.5,false);
+	this.tones.playFrequency(40,.5,false);
+	this.tones.playFrequency(40,.5,false);
+	this.setupUI();
 };
 tones_examples_LorenzTones.__name__ = true;
 tones_examples_LorenzTones.prototype = {
-	enterFrame: function(time) {
+	onToneStart: function(id,poly) {
+		if(poly == 3) {
+			this.osc1 = this.tones.activeTones.h[0].osc;
+			this.osc2 = this.tones.activeTones.h[1].osc;
+			this.osc3 = this.tones.activeTones.h[2].osc;
+			window.requestAnimationFrame($bind(this,this.enterFrame));
+		}
+	}
+	,enterFrame: function(time) {
 		window.requestAnimationFrame($bind(this,this.enterFrame));
 		var dt = time - this.lastTime;
 		this.lastTime = time;
 		if(dt == 0) return;
-		var dtSecs = dt / 1000;
-		this.lorenz.step(0.0083333333333333332);
-		var lx = this.lorenz.x;
-		var ly = this.lorenz.y;
-		var lz = this.lorenz.z;
+		var _g1 = 0;
+		var _g = this.speed;
+		while(_g1 < _g) {
+			var i = _g1++;
+			this.lorenz.step(0.00078125);
+		}
+		var lx = this.lorenz.xyz[0];
+		var ly = this.lorenz.xyz[1];
+		var lz = this.lorenz.xyz[2];
 		this.minMax[0] = Math.min(this.minMax[0],lx);
 		this.minMax[1] = Math.max(this.minMax[1],lx);
 		this.minMax[2] = Math.min(this.minMax[2],ly);
@@ -1344,24 +1365,28 @@ tones_examples_LorenzTones.prototype = {
 		var y = (ly - this.minMax[2]) / (this.minMax[3] - this.minMax[2]);
 		var z = (lz - this.minMax[4]) / (this.minMax[5] - this.minMax[4]);
 		if(x < 0 || isNaN(x)) x = 0;
-		if(y < 0) y = 0;
+		if(y < 0 || isNaN(y)) y = 0;
 		if(z < 0 || !isFinite(z)) z = 0;
 		var now = this.tones.context.currentTime;
 		this.osc1.frequency.cancelScheduledValues(now);
 		this.osc2.frequency.cancelScheduledValues(now);
 		this.osc3.frequency.cancelScheduledValues(now);
-		var tc = Math.log(dtSecs + 1.0) / 4.605170185988092;
-		this.osc1.frequency.setTargetAtTime(20 + x * 440,now,tc);
-		this.osc2.frequency.setTargetAtTime(20 + y * 440,now,tc);
-		this.osc3.frequency.setTargetAtTime(20 + z * 440,now,tc);
+		var range = this.freqHigh - this.freqLow;
+		var tc = Math.log(dt / 1000 + 1.0) / 4.605170185988092;
+		this.osc1.frequency.setTargetAtTime(this.freqLow + x * range,now,tc);
+		this.osc2.frequency.setTargetAtTime(this.freqLow + y * range,now,tc);
+		this.osc3.frequency.setTargetAtTime(this.freqLow + z * range,now,tc);
 	}
-	,onToneStart: function(id,poly) {
-		if(poly == 3) {
-			this.osc1 = this.tones.activeTones.h[0].osc;
-			this.osc2 = this.tones.activeTones.h[1].osc;
-			this.osc3 = this.tones.activeTones.h[2].osc;
-			window.requestAnimationFrame($bind(this,this.enterFrame));
-		}
+	,setupUI: function() {
+		var _g = this;
+		this.gui = new dat.gui.GUI({ autoPlace : false});
+		this.gui.add({ volume : this.masterGain.gain.value},"volume",0,1).step(0.00390625).onChange(function(_) {
+			_g.masterGain.gain.setValueAtTime(_,_g.tones.context.currentTime + .1);
+		});
+		this.gui.add(this,"speed",1,128).step(1);
+		this.gui.add(this,"freqLow",20,440);
+		this.gui.add(this,"freqHigh",20,440);
+		window.document.body.appendChild(this.gui.domElement);
 	}
 	,__class__: tones_examples_LorenzTones
 };
@@ -1369,17 +1394,15 @@ var tones_examples_Lorenz = function() {
 	this.sigma = 10.0;
 	this.rho = 28.0;
 	this.beta = 2.6666666666666665;
-	this.x = 1;
-	this.y = 1;
-	this.z = 1;
+	this.xyz = new Float32Array([1.0,1.0,1.0]);
 };
 tones_examples_Lorenz.__name__ = true;
 tones_examples_Lorenz.prototype = {
 	step: function(dt) {
 		if(dt == null) dt = 0.0083333333333333332;
-		this.x = this.x + dt * (this.sigma * (this.y - this.x));
-		this.y = this.y + dt * (this.x * (this.rho - this.z) - this.y);
-		this.z = this.z + dt * (this.x * this.y - this.beta * this.z);
+		this.xyz[0] = this.xyz[0] + dt * (this.sigma * (this.xyz[1] - this.xyz[0]));
+		this.xyz[1] = this.xyz[1] + dt * (this.xyz[0] * (this.rho - this.xyz[2]) - this.xyz[1]);
+		this.xyz[2] = this.xyz[2] + dt * (this.xyz[0] * this.xyz[1] - this.beta * this.xyz[2]);
 	}
 	,__class__: tones_examples_Lorenz
 };
@@ -1394,8 +1417,8 @@ tones_examples_RandomSequence.__name__ = true;
 tones_examples_RandomSequence.prototype = {
 	playRandom: function() {
 		this.tones.set_volume(.001 + Math.random() * .04);
-		this.tones.set_attack(Math.random() * Math.random() * 250);
-		this.tones.set_release(10 + Math.random() * Math.random() * 500);
+		this.tones.set_attack(10 + Math.random() * Math.random() * 500);
+		this.tones.set_release(20 + Math.random() * Math.random() * 500);
 		var freq = 50 + Math.random() * 600;
 		var delay = Math.random();
 		this.tones.playFrequency(freq,delay);
@@ -1403,8 +1426,8 @@ tones_examples_RandomSequence.prototype = {
 	,onToneBegin: function(id,polyphony) {
 		if(polyphony < 3) this.playRandom();
 	}
-	,onToneEnd: function(id,polyphony) {
-		if(polyphony < 3) this.playRandom();
+	,onToneEnd: function(id,poly) {
+		if(poly < 3) this.playRandom();
 	}
 	,__class__: tones_examples_RandomSequence
 };

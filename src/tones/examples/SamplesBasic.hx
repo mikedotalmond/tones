@@ -2,8 +2,10 @@ package tones.examples;
 
 import js.html.audio.AudioBuffer;
 import js.html.XMLHttpRequestResponseType;
+
 import tones.Samples;
 import tones.utils.NoteFrequencyUtil;
+import tones.utils.TimeUtil;
 
 import js.html.XMLHttpRequest;
 /**
@@ -51,23 +53,19 @@ class SamplesBasic {
 	}
 	
 	function playSequence() {
-		samples.playSample(buffer, stepTime(1)); 
-		samples.playSample(buffer, stepTime(2)); 
-		samples.playSample(buffer, stepTime(3)); 
-		samples.playSample(buffer, stepTime(4)); 
-		samples.playSample(buffer, stepTime(5)); 
-		samples.playSample(buffer, stepTime(6)); 
-		samples.playSample(buffer, stepTime(6.25)); 
-		samples.playSample(buffer, stepTime(6.5)); 
-		samples.playSample(buffer, stepTime(6.75)); 
-		samples.playSample(buffer, stepTime(7)); 
-		samples.playSample(buffer, stepTime(7.25)); 
-		samples.playSample(buffer, stepTime(7.5)); 
-		samples.playSample(buffer, stepTime(7.75));
-		restartId = samples.playSample(buffer, stepTime(8));
-	}
-	
-	inline static function stepTime(beats:Float, bpm:Float = 119):Float {
-		return beats / (bpm / 60);
+		samples.playSample(buffer, TimeUtil.stepTime(1)); 
+		samples.playSample(buffer, TimeUtil.stepTime(2)); 
+		samples.playSample(buffer, TimeUtil.stepTime(3)); 
+		samples.playSample(buffer, TimeUtil.stepTime(4)); 
+		samples.playSample(buffer, TimeUtil.stepTime(5)); 
+		samples.playSample(buffer, TimeUtil.stepTime(6)); 
+		samples.playSample(buffer, TimeUtil.stepTime(6.25)); 
+		samples.playSample(buffer, TimeUtil.stepTime(6.5)); 
+		samples.playSample(buffer, TimeUtil.stepTime(6.75)); 
+		samples.playSample(buffer, TimeUtil.stepTime(7)); 
+		samples.playSample(buffer, TimeUtil.stepTime(7.25)); 
+		samples.playSample(buffer, TimeUtil.stepTime(7.5)); 
+		samples.playSample(buffer, TimeUtil.stepTime(7.75));
+		restartId = samples.playSample(buffer, TimeUtil.stepTime(8));
 	}
 }

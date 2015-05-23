@@ -37,13 +37,14 @@ class SamplesBasic {
 		
 		samples.attack = 0;
 		
+		// play it pitched up a bit (5 tones)
 		var rate = NoteFrequencyUtil.rateFromNote(5, 0, 0);
 		
 		samples.release = buffer.duration / rate;
 		samples.playbackRate = rate;
 		
 		restartId = samples.lastId;
-		samples.playSample(buffer, 0); 
+		samples.playSample(buffer, .5); 
 	}
 	
 	function onSampleBegin(id:Int, poly:Int) {

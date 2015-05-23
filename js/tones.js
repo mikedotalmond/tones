@@ -807,11 +807,15 @@ js_Browser.createXMLHttpRequest = function() {
 var tones_OscillatorTypeShim = function() { };
 tones_OscillatorTypeShim.__name__ = true;
 var tones_Tones = function(audioContext,destinationNode) {
+	this.lastTime = .0;
 	this.ID = 0;
 	this.customWave = null;
 	var _g = this;
 	if(audioContext == null) this.context = tones_Tones.createContext(); else this.context = audioContext;
 	if(destinationNode == null) this.destination = this.context.destination; else this.destination = destinationNode;
+	this.delayedBegin = [];
+	this.delayedRelease = [];
+	this.delayedEnd = [];
 	this.polyphony = 0;
 	this.activeTones = new haxe_ds_IntMap();
 	this.toneReleased = new hxsignal_impl_Signal1();
@@ -831,6 +835,7 @@ var tones_Tones = function(audioContext,destinationNode) {
 	this.toneEnd.connect(function(id2,poly1) {
 		console.log("toneEnd | id:" + id2 + ", polyphony:" + poly1 + ", time:" + _g.context.currentTime);
 	});
+	this.tick(.0);
 };
 tones_Tones.__name__ = true;
 tones_Tones.createContext = function() {
@@ -854,17 +859,9 @@ tones_Tones.prototype = {
 		osc.frequency.value = freq;
 		osc.connect(envelope);
 		osc.start(triggerTime);
-		var delayMillis = Math.floor(delayBy * 1000);
 		this.activeTones.h[id] = { id : id, osc : osc, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
-		if(delayMillis == 0) this.triggerToneBegin(id); else {
-			var tmp;
-			var f = $bind(this,this.triggerToneBegin);
-			var id1 = id;
-			tmp = function() {
-				f(id1);
-			};
-			haxe_Timer.delay(tmp,delayMillis);
-		}
+		var delayMillis = Math.floor(delayBy * 1000);
+		if(delayMillis == 0) this.triggerToneBegin(id); else this.delayedBegin.push({ id : id, time : triggerTime});
 		if(autoRelease) this.doRelease(id,releaseTime);
 		return id;
 	}
@@ -880,25 +877,11 @@ tones_Tones.prototype = {
 		if(atTime < nowTime) time = nowTime; else time = atTime;
 		time += this.releaseFudge;
 		var dt = time - nowTime;
-		var dtMillis = Math.round(dt * 1000);
-		if(dtMillis > 0) {
-			var tmp1;
-			var f = ($_=this.toneReleased,$bind($_,$_.emit));
-			var p1 = id;
-			tmp1 = function() {
-				f(p1);
-			};
-			haxe_Timer.delay(tmp1,dtMillis);
-		} else this.toneReleased.emit(id);
+		if(dt > 0) this.delayedRelease.push({ id : id, time : time}); else this.toneReleased.emit(id);
+		var releaseSeconds = data.release / 1000;
 		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.setTargetAtTime(0,time,Math.log(data.release / 1000 + 1.0) / 4.605170185988092);
-		var tmp;
-		var f1 = $bind(this,this.doStop);
-		var id1 = id;
-		tmp = function() {
-			f1(id1);
-		};
-		haxe_Timer.delay(tmp,Math.round(dtMillis + data.release));
+		data.env.gain.setTargetAtTime(0,time,Math.log(releaseSeconds + 1.0) / 4.605170185988092);
+		this.delayedEnd.push({ id : id, time : time + releaseSeconds});
 	}
 	,releaseAll: function(atTime) {
 		if(atTime == null) atTime = -1;
@@ -937,6 +920,42 @@ tones_Tones.prototype = {
 	,triggerToneEnd: function(id) {
 		this.polyphony--;
 		this.toneEnd.emit(id,this.polyphony);
+	}
+	,tick: function(_) {
+		window.requestAnimationFrame($bind(this,this.tick));
+		var t = this.context.currentTime;
+		var halfDt = (t - this.lastTime) / 2;
+		this.lastTime = t;
+		var j = 0;
+		var n = this.delayedBegin.length;
+		while(j < n) {
+			var item = this.delayedBegin[j];
+			if(t > item.time + halfDt) {
+				this.triggerToneBegin(item.id);
+				this.delayedBegin.splice(j,1);
+				n--;
+			} else j++;
+		}
+		j = 0;
+		n = this.delayedRelease.length;
+		while(j < n) {
+			var item1 = this.delayedRelease[j];
+			if(t > item1.time + halfDt) {
+				this.toneReleased.emit(item1.id);
+				this.delayedRelease.splice(j,1);
+				n--;
+			} else j++;
+		}
+		j = 0;
+		n = this.delayedEnd.length;
+		while(j < n) {
+			var item2 = this.delayedEnd[j];
+			if(t > item2.time + halfDt) {
+				this.doStop(item2.id);
+				this.delayedEnd.splice(j,1);
+				n--;
+			} else j++;
+		}
 	}
 	,__class__: tones_Tones
 };
@@ -1426,8 +1445,8 @@ tones_examples_RandomSequence.prototype = {
 	,onToneBegin: function(id,polyphony) {
 		if(polyphony < 3) this.playRandom();
 	}
-	,onToneEnd: function(id,poly) {
-		if(poly < 3) this.playRandom();
+	,onToneEnd: function(id,polyphony) {
+		if(polyphony < 3) this.playRandom();
 	}
 	,__class__: tones_examples_RandomSequence
 };

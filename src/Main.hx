@@ -58,6 +58,9 @@ class Main {
 				 * **/
 				var polysynth = new KeyboardControlled();
 			
+			case '?samples':
+				var samples = new SamplesBasic();
+				
 			default: 
 				Browser.document.location.search = '?basic';
 		}

@@ -167,11 +167,11 @@ class NoteFrequencyUtil {
 		return freq; 
 	}
 	
-	
 	/**
-	 * transpose a sample
-	 * @param	dest	The destination key
-	 * @param	root	The root key
+	 * 
+	 * @param	note The destination key
+	 * @param	cents Detune cents
+	 * @param	root The root key
 	 * @return	Playback rate for the destination key, given the root key
 	 */
 	public static inline function rateFromNote(note:Float, cents:Float, root:Float):Float {

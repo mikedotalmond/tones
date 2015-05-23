@@ -3,17 +3,11 @@ package tones;
 import haxe.Timer;
 import hxsignal.Signal;
 import js.Browser;
+import js.html.audio.AudioBuffer;
 
 import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
 import js.html.audio.GainNode;
-import js.html.audio.OscillatorNode;
-
-#if (haxe_ver <= 3.103)
-typedef PeriodicWave = js.html.audio.WaveTable;
-#else
-import js.html.audio.PeriodicWave;
-#end
 
 /**
  * ...
@@ -21,7 +15,7 @@ import js.html.audio.PeriodicWave;
  * @author Mike Almond - https://github.com/mikedotalmond
  */
 
-class Tones {
+class Samples {
   
 	static public inline var TimeConstDivider = 4.605170185988092; // Math.log(100);
 	static public inline function getTimeConstant(time:Float) return Math.log(time + 1.0) / TimeConstDivider;
@@ -37,25 +31,26 @@ class Tones {
 	public var destination(default, null):AudioNode;
 	
 	
-	public var type:OscillatorType;	
-	public var customWave:PeriodicWave = null;
+	public var buffer:AudioBuffer = null;
 	
 	public var attack	(get, set):Float; // milliseconds
 	public var release	(get, set):Float; // milliseconds
 	public var volume	(get, set):Float;
+	public var playbackRate:Float;
 	
+	public var lastId		(default, null):Int;
 	public var polyphony	(default, null):Int;
-	public var activeTones	(default, null):Map<Int, ToneData>;
-	public var toneBegin	(default, null):Signal<Int->Int->Void>;
-	public var toneEnd		(default, null):Signal<Int->Int->Void>;
-	public var toneReleased	(default, null):Signal<Int->Void>;
-	
+	public var activeSamples(default, null):Map<Int, SampleData>;
+	public var sampleBegin	(default, null):Signal<Int->Int->Void>;
+	public var sampleEnd	(default, null):Signal<Int->Int->Void>;
+	public var sampleRelease(default, null):Signal<Int->Void>;
 	
 	var ID:Int = 0;
 	var _attack:Float;
 	var _release:Float;
 	var _volume:Float;
 	var releaseFudge:Float;
+	var lastTime:Float = .0;
 	
 	var delayedBegin:Array<{id:Int, time:Float}>;
 	var delayedRelease:Array<{id:Int, time:Float}>;
@@ -80,11 +75,12 @@ class Tones {
 		delayedRelease = [];
 		delayedEnd = [];
 		
+		lastId = ID;
 		polyphony = 0;
-		activeTones = new Map<Int, ToneData>();
-		toneReleased = new Signal<Int->Void>();
-		toneBegin = new Signal<Int->Int->Void>();
-		toneEnd = new Signal<Int->Int->Void>();
+		activeSamples = new Map<Int, SampleData>();
+		sampleRelease = new Signal<Int->Void>();
+		sampleBegin = new Signal<Int->Int->Void>();
+		sampleEnd = new Signal<Int->Int->Void>();
 		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
 		// (apparently about 4096 samples worth of data (1 buffer perhaps?))
 		// If I use context.currentTime the setTargetAtTime will not fade-out, it just ends aruptly.  
@@ -93,20 +89,20 @@ class Tones {
 		releaseFudge = isFirefox() ? (4096 / context.sampleRate) : 0;
 		
 		// set some reasonable defaults
-		type 	= OscillatorType.SINE;
-		attack 	= 10.0;
-		release = 100.0;
-		volume 	= .1;
+		attack 	= 0.0;
+		release = 1.0;
+		volume 	= .2;
+		playbackRate = 1.0;
 		
 		#if debug
-		toneBegin.connect(function(id, poly) {
-			trace('toneBegin | id:$id, polyphony:$poly, time:${now()}');
+		sampleBegin.connect(function(id, poly) {
+			trace('sampleBegin | id:$id, polyphony:$poly, time:${now()}');
 		});		
-		toneReleased.connect(function(id) {
-			trace('toneReleased | id:$id, time:${now()}');
+		sampleRelease.connect(function(id) {
+			trace('sampleRelease | id:$id, time:${now()}');
 		});
-		toneEnd.connect(function(id, poly) {
-			trace('toneEnd | id:$id, polyphony:$poly, time:${now()}');
+		sampleEnd.connect(function(id, poly) {
+			trace('sampleEnd | id:$id, polyphony:$poly, time:${now()}');
 		});
 		#end
 		
@@ -115,7 +111,7 @@ class Tones {
 	
 	
 	/**
-	 * Play a frequency
+	 * Play a sample
 	 * tones.playFrequency(440); // plays a 440 Hz tone
 	 * tones.playFrequency(440, 1); // plays a 440 Hz tone, in one second
 	 * tones.playFrequency(440, 1, false); // plays a 440 Hz tone, in one second, and doesn't release untill you call doRelease(toneId)
@@ -127,39 +123,31 @@ class Tones {
 	 * 						- Don't use these behaviours at the same time in one Tones instance 
 	 * @return 	toneId		- The ID assigned to the tone being played. Use for doRelease() when using autoRelease=false
 	 */
-    public function playFrequency(freq:Float, delayBy:Float = .0, autoRelease:Bool = true):Int {
+    public function playSample(buffer:AudioBuffer, delayBy:Float = .0, autoRelease:Bool = true):Int {
 	   
 		var id = ID; ID++;
+		lastId = id;
 		
-		var attackSeconds = attack / 1000;
 		var envelope = context.createGain();
 		var triggerTime = now() + delayBy;
-		var releaseTime = triggerTime + attackSeconds;
+		var releaseTime = triggerTime + attack;
 		
 		envelope.gain.value = 0;
 		envelope.connect(destination);
-		
 		// attack
-		envelope.gain.setTargetAtTime(volume, triggerTime, getTimeConstant(attackSeconds));
+		envelope.gain.setTargetAtTime(volume, triggerTime, getTimeConstant(attack));
 		
-		var osc = context.createOscillator();
-		if (type == OscillatorType.CUSTOM) osc.setPeriodicWave(customWave);
-		else osc.type = cast type; // firefox throws InvalidStateError if setting osc type and using setPeriodicWave
+		var src = context.createBufferSource();
+		src.buffer = buffer;
+		src.playbackRate.value = playbackRate;
 		
-		// set freq value before connecting
-		osc.frequency.value = freq;
+		src.connect(envelope);
+		src.start(triggerTime);
 		
-		osc.connect(envelope);
-		osc.start(triggerTime);
+		activeSamples.set(id, { id:id, src:src, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 		
-		activeTones.set(id, { id:id, osc:osc, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
-		
-		// The tone won't actually begin now if there's a delay set... 
-		// if only there were a way to get a callback or event to fire at a specific audio conext time... Timer.delay will have to do.
-		var delayMillis = Math.floor(delayBy * 1000);
-		
-		if (delayMillis == 0) triggerToneBegin(id);
-		else delayedBegin.push({id:id, time:triggerTime});//Timer.delay(triggerToneBegin.bind(id), delayMillis);
+		if (delayBy == .0) triggerSampleBegin(id);
+		else delayedBegin.push({id:id, time:triggerTime});
 		
 		if (autoRelease) doRelease(id, releaseTime);
 		
@@ -182,7 +170,7 @@ class Tones {
 	 * @param	atTime - the context time to release at. Don't pass anything and release begins immediately.
 	 */
 	public function doRelease(id:Int, atTime:Float=-1) {
-		var data = getToneData(id);
+		var data = getSampleData(id);
 		if (data == null) return;
 		
 		var time;
@@ -194,23 +182,22 @@ class Tones {
 		time += releaseFudge;
 		var dt = time - nowTime;
 		
-		if (dt > 0) delayedRelease.push( { id:id, time:time } ); //Timer.delay(toneReleased.emit.bind(id), dtMillis);
-		else toneReleased.emit(id);
+		if (dt > 0) delayedRelease.push( { id:id, time:time } );
+		else sampleRelease.emit(id);
 		
-		var releaseSeconds = data.release / 1000;
 		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.setTargetAtTime(0, time, getTimeConstant(releaseSeconds));
-		delayedEnd.push( { id:id, time:time + releaseSeconds } );
+		data.env.gain.setTargetAtTime(0, time, getTimeConstant(release));
+		delayedEnd.push( { id:id, time:time + release } );
 	}
 	
 	
 	public function releaseAll(atTime:Float = -1) {
-		for (id in activeTones.keys()) doRelease(id, atTime);
+		for (id in activeSamples.keys()) doRelease(id, atTime);
 	}
 	
 	
 	public function stopAll() {
-		for (id in activeTones.keys()) doStop(id);
+		for (id in activeSamples.keys()) doStop(id);
 	}
 	
     
@@ -219,27 +206,27 @@ class Tones {
 	 * @param	id
 	 */
 	public function doStop(id:Int) {
-		var data = activeTones.get(id);
+		var data = activeSamples.get(id);
 		if (data == null) return;
 		
-		data.osc.stop(now());
-		data.osc.disconnect();
+		data.src.stop(now());
+		data.src.disconnect();
 		
 		data.env.gain.cancelScheduledValues(now());
 		data.env.disconnect();
 		
-		triggerToneEnd(id);
+		triggerSampleEnd(id);
 		
-		activeTones.remove(id);
+		activeSamples.remove(id);
 	}
 	
 	
 	/**
-	 * Gets the ToneData for an active tone (osc,env,settings,etc)
+	 * Gets the SampleData for an active tone (src,env,settings,etc)
 	 * @param	id
-	 * @return	ToneData
+	 * @return	SampleData
 	 */
-	inline public function getToneData(id:Int):ToneData return activeTones.get(id);
+	inline public function getSampleData(id:Int):SampleData return activeSamples.get(id);
 	
 	
 	/**
@@ -253,13 +240,13 @@ class Tones {
 	
 	inline function get_attack():Float return _attack;
 	function set_attack(value:Float):Float {
-		if (value < 1) value = 1;
+		if (value < 0.0001) value = 0.0001;
 		return _attack = value;
 	}
 	
 	inline function get_release():Float return _release;
 	function set_release(value:Float):Float {
-		if (value < 1) value = 1;
+		if (value < 0.0001) value = 0.0001;
 		return _release = value;
 	}
 	
@@ -272,18 +259,17 @@ class Tones {
 	
 	
 	// internal
-	function triggerToneBegin(id:Int):Void {
+	function triggerSampleBegin(id:Int):Void {
 		polyphony++;
-		toneBegin.emit(id, polyphony);
+		sampleBegin.emit(id, polyphony);
 	}
 	
-	function triggerToneEnd(id:Int):Void {
+	function triggerSampleEnd(id:Int):Void {
 		polyphony--;
-		toneEnd.emit(id, polyphony);
+		sampleEnd.emit(id, polyphony);
 	}
 	
 	
-	var lastTime:Float = .0;
 	function tick(_) {
 		
 		// regularly check for delayed starts, releases, and stops 
@@ -303,7 +289,7 @@ class Tones {
 		while (j < n) {
 			var item = delayedBegin[j];
 			if (t > item.time + halfDt) {
-				triggerToneBegin(item.id);
+				triggerSampleBegin(item.id);
 				delayedBegin.splice(j, 1);
 				n--;
 			} else {
@@ -316,7 +302,7 @@ class Tones {
 		while (j < n) {
 			var item = delayedRelease[j];
 			if (t > item.time + halfDt) {
-				toneReleased.emit(item.id);
+				sampleRelease.emit(item.id);
 				delayedRelease.splice(j, 1);
 				n--;
 			} else {

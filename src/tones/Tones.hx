@@ -57,6 +57,10 @@ class Tones {
 	var _volume:Float;
 	var releaseFudge:Float;
 	
+	var delayedBegin:Array<{id:Int, time:Float}>;
+	var delayedRelease:Array<{id:Int, time:Float}>;
+	var delayedEnd:Array<{id:Int, time:Float}>;
+	
 	/**
 	 * @param	audioContext 	- optional. Pass an exsiting audioContext here to share it.
 	 * @param	destinationNode - optional. Pass a custom destination AudioNode to connect to.
@@ -71,6 +75,10 @@ class Tones {
 		
 		if (destinationNode == null) destination = context.destination;
 		else destination = destinationNode;
+		
+		delayedBegin = [];
+		delayedRelease = [];
+		delayedEnd = [];
 		
 		polyphony = 0;
 		activeTones = new Map<Int, ToneData>();
@@ -101,6 +109,8 @@ class Tones {
 			trace('toneEnd | id:$id, polyphony:$poly, time:${now()}');
 		});
 		#end
+		
+		tick(.0);
 	}
 	
 	
@@ -142,18 +152,18 @@ class Tones {
 		osc.connect(envelope);
 		osc.start(triggerTime);
 		
-		var delayMillis = Math.floor(delayBy * 1000);
-		
 		activeTones.set(id, { id:id, osc:osc, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 		
 		// The tone won't actually begin now if there's a delay set... 
 		// if only there were a way to get a callback or event to fire at a specific audio conext time... Timer.delay will have to do.
+		var delayMillis = Math.floor(delayBy * 1000);
+		
 		if (delayMillis == 0) triggerToneBegin(id);
-		else Timer.delay(triggerToneBegin.bind(id), delayMillis);
+		else delayedBegin.push({id:id, time:triggerTime});//Timer.delay(triggerToneBegin.bind(id), delayMillis);
 		
 		if (autoRelease) doRelease(id, releaseTime);
 		
-		return id;		
+		return id;
 	}
 	
 	/**
@@ -183,14 +193,14 @@ class Tones {
 		
 		time += releaseFudge;
 		var dt = time - nowTime;
-		var dtMillis = Math.round(dt * 1000);
 		
-		if (dtMillis > 0) Timer.delay(toneReleased.emit.bind(id), dtMillis);
+		if (dt > 0) delayedRelease.push( { id:id, time:time } ); //Timer.delay(toneReleased.emit.bind(id), dtMillis);
 		else toneReleased.emit(id);
 		
+		var releaseSeconds = data.release / 1000;
 		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.setTargetAtTime(0, time, getTimeConstant(data.release / 1000));
-		Timer.delay(doStop.bind(id), Math.round(dtMillis + data.release));
+		data.env.gain.setTargetAtTime(0, time, getTimeConstant(releaseSeconds));
+		delayedEnd.push( { id:id, time:time + releaseSeconds } );
 	}
 	
 	
@@ -271,5 +281,61 @@ class Tones {
 	function triggerToneEnd(id:Int):Void {
 		polyphony--;
 		toneEnd.emit(id, polyphony);
+	}
+	
+	
+	var lastTime:Float = .0;
+	function tick(_) {
+		
+		// regularly check for delayed starts, releases, and stops 
+		// in a requestAnimationFrame callback instead of creating
+		// lots of anonymous Timer.delay callbacks
+		// no function allocations, just array modification
+		// could optimise further if there was a maximum polyphony limit...
+		
+		Browser.window.requestAnimationFrame(tick);
+		
+		var t = now();
+		var halfDt = (t - lastTime) / 2;
+		lastTime = t;
+		
+		var j = 0;
+		var n = delayedBegin.length;
+		while (j < n) {
+			var item = delayedBegin[j];
+			if (t > item.time + halfDt) {
+				triggerToneBegin(item.id);
+				delayedBegin.splice(j, 1);
+				n--;
+			} else {
+				j++;
+			}
+		}
+		
+		j = 0;
+		n = delayedRelease.length;
+		while (j < n) {
+			var item = delayedRelease[j];
+			if (t > item.time + halfDt) {
+				toneReleased.emit(item.id);
+				delayedRelease.splice(j, 1);
+				n--;
+			} else {
+				j++;
+			}
+		}
+		
+		j = 0;
+		n = delayedEnd.length;
+		while (j < n) {
+			var item = delayedEnd[j];
+			if (t > item.time + halfDt) {
+				doStop(item.id);
+				delayedEnd.splice(j, 1);
+				n--;
+			} else {
+				j++;
+			}
+		}
 	}
 }

@@ -30,8 +30,8 @@ class RandomSequence {
 	function playRandom() {
 		
 		tones.volume = .001 + Math.random() * .04;
-		tones.attack = 10 + Math.random() * Math.random() * 500;
-		tones.release = 20 + Math.random() * Math.random() * 500;
+		tones.attack = .010 + Math.random() * Math.random() * .500;
+		tones.release = .020 + Math.random() * Math.random() * .500;
 		
 		var freq = 50 + Math.random() * 600; // 50Hz - 650Hz
 		var delay = Math.random(); // delay from 0-1 seconds before playing

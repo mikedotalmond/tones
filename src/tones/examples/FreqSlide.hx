@@ -21,8 +21,8 @@ class FreqSlide {
 		// change some settings...
 		tones.type = OscillatorType.SQUARE;
 		tones.volume = .04;
-		tones.attack = 200;
-		tones.release = 400;
+		tones.attack = .200;
+		tones.release = .400;
 		
 		tones.playFrequency(220, .5, false);
 	}

@@ -36,8 +36,8 @@ class CustomWaves {
 		
 		tones = new Tones();
 		tones.volume = .15;
-		tones.attack = 10;
-		tones.release = 500;
+		tones.attack = .010;
+		tones.release = .500;
 		tones.type = OscillatorType.CUSTOM;
 		
 		wavetables = new Wavetables();

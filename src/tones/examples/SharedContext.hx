@@ -39,14 +39,14 @@ class SharedContext {
 		// change some settings...
 		tones1.type = OscillatorType.SAWTOOTH;
 		tones1.volume = .2;
-		tones1.attack = 1;
-		tones1.release = 2500;
+		tones1.attack = .001;
+		tones1.release = 2.500;
 		
 		// change some settings...
 		tones2.type = OscillatorType.SQUARE;
 		tones2.volume = .2;
-		tones2.attack = 500;
-		tones2.release = 1500;
+		tones2.attack = .500;
+		tones2.release = 1.500;
 		
 		// wait .1 seconds, then play a note...
 		tones1.playFrequency(220, .5);

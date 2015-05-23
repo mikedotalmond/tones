@@ -40,8 +40,8 @@ class Tones {
 	public var type:OscillatorType;	
 	public var customWave:PeriodicWave = null;
 	
-	public var attack	(get, set):Float; // milliseconds
-	public var release	(get, set):Float; // milliseconds
+	public var attack	(get, set):Float; // seconds
+	public var release	(get, set):Float; // seconds
 	public var volume	(get, set):Float;
 	
 	public var polyphony	(default, null):Int;
@@ -94,8 +94,8 @@ class Tones {
 		
 		// set some reasonable defaults
 		type 	= OscillatorType.SINE;
-		attack 	= 10.0;
-		release = 100.0;
+		attack 	= .001;
+		release = .25;
 		volume 	= .1;
 		
 		#if debug
@@ -131,16 +131,15 @@ class Tones {
 	   
 		var id = ID; ID++;
 		
-		var attackSeconds = attack / 1000;
 		var envelope = context.createGain();
 		var triggerTime = now() + delayBy;
-		var releaseTime = triggerTime + attackSeconds;
+		var releaseTime = triggerTime + attack;
 		
 		envelope.gain.value = 0;
 		envelope.connect(destination);
 		
 		// attack
-		envelope.gain.setTargetAtTime(volume, triggerTime, getTimeConstant(attackSeconds));
+		envelope.gain.setTargetAtTime(volume, triggerTime, getTimeConstant(attack));
 		
 		var osc = context.createOscillator();
 		if (type == OscillatorType.CUSTOM) osc.setPeriodicWave(customWave);
@@ -155,12 +154,9 @@ class Tones {
 		activeTones.set(id, { id:id, osc:osc, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 		
 		// The tone won't actually begin now if there's a delay set... 
-		// if only there were a way to get a callback or event to fire at a specific audio conext time... Timer.delay will have to do.
-		var delayMillis = Math.floor(delayBy * 1000);
-		
-		if (delayMillis == 0) triggerToneBegin(id);
-		else delayedBegin.push({id:id, time:triggerTime});//Timer.delay(triggerToneBegin.bind(id), delayMillis);
-		
+		// if only there were a way to get a callback or event to fire at a specific audio conext time...
+		if (delayBy == 0) triggerToneBegin(id);
+		else delayedBegin.push( { id:id, time:triggerTime } );		
 		if (autoRelease) doRelease(id, releaseTime);
 		
 		return id;
@@ -194,13 +190,12 @@ class Tones {
 		time += releaseFudge;
 		var dt = time - nowTime;
 		
-		if (dt > 0) delayedRelease.push( { id:id, time:time } ); //Timer.delay(toneReleased.emit.bind(id), dtMillis);
+		if (dt > 0) delayedRelease.push( { id:id, time:time } );
 		else toneReleased.emit(id);
 		
-		var releaseSeconds = data.release / 1000;
 		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.setTargetAtTime(0, time, getTimeConstant(releaseSeconds));
-		delayedEnd.push( { id:id, time:time + releaseSeconds } );
+		data.env.gain.setTargetAtTime(0, time, getTimeConstant(data.release));
+		delayedEnd.push( { id:id, time:time + data.release } );
 	}
 	
 	
@@ -253,13 +248,13 @@ class Tones {
 	
 	inline function get_attack():Float return _attack;
 	function set_attack(value:Float):Float {
-		if (value < 1) value = 1;
+		if (value < 0.0001) value = 0.0001;
 		return _attack = value;
 	}
 	
 	inline function get_release():Float return _release;
 	function set_release(value:Float):Float {
-		if (value < 1) value = 1;
+		if (value < 0.0001) value = 0.0001;
 		return _release = value;
 	}
 	

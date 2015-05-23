@@ -52,7 +52,7 @@ class LorenzTones {
 		// change some settings...
 		tones.type = OscillatorType.TRIANGLE;
 		tones.volume = .2;
-		tones.attack = 250;
+		tones.attack = .250;
 		
 		tones.playFrequency(40, .5, false);
 		tones.playFrequency(40, .5, false);

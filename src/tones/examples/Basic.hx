@@ -23,7 +23,7 @@ class Basic {
 		
 		// change some settings...
 		tones.volume = .05;
-		tones.attack = 500;
+		tones.attack = .500;
 		
 		// NoteFrequencyUtil has various util/conversion functions for working with musical notes and frequencies
 		var freqUtil = new NoteFrequencyUtil();

@@ -14,8 +14,8 @@ class ReleaseLater {
 		// change some settings...
 		tones.type = OscillatorType.SQUARE;
 		tones.volume = .05;
-		tones.attack = 200;
-		tones.release = 2500;
+		tones.attack = .200;
+		tones.release = 2.5;
 		
 		// wait .1 seconds, then play a note that won't release until you call doRelease(id)
 		var noteId1 = tones.playFrequency(220, .1, false);

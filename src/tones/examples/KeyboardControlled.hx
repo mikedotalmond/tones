@@ -56,14 +56,14 @@ class KeyboardControlled {
 		tonesA			= new Tones(context, outGain);
 		tonesA.type 	= OscillatorType.SQUARE;
 		tonesA.volume   = .62;
-		tonesA.attack  	= 1;
-		tonesA.release 	= 2000;
+		tonesA.attack  	= 0;
+		tonesA.release 	= 2;
 		
 		tonesB			= new Tones(context, outGain);
 		tonesB.type 	= OscillatorType.SQUARE;
 		tonesB.volume   = .48;
-		tonesB.attack  	= 2000;
-		tonesB.release 	= 133;
+		tonesB.attack  	= 2;
+		tonesB.release 	= .133;
 		
 		outGain.connect(context.destination);
 		
@@ -97,9 +97,9 @@ class KeyboardControlled {
 		
 		folder = gui.addFolder('Osc A');
 		folder2 = folder.addFolder('Randomise');
-		folder.add(tonesA, '_volume', 0, 1).step(1/256).listen();
-		folder.add(tonesA, '_attack', 1, 2000).step(1/256).listen();
-		folder.add(tonesA, '_release', 1, 2000).step(1/256).listen();
+		folder.add(tonesA, '_volume', 0, 1).listen();
+		folder.add(tonesA, '_attack', .0001, 2).listen();
+		folder.add(tonesA, '_release', .0001, 2).listen();
 		folder.add( { waveform:'Square' }, 'waveform', allWaveNames).onChange(onWaveformSelect.bind(_, tonesA));
 		folder.open();
 		
@@ -111,9 +111,9 @@ class KeyboardControlled {
 		
 		folder = gui.addFolder('Osc B');
 		folder2 = folder.addFolder('Randomise');
-		folder.add(tonesB, '_volume', 0, 1).step(1/256).listen();
-		folder.add(tonesB, '_attack', 1, 2000).step(1/256).listen();
-		folder.add(tonesB, '_release', 1, 2000).step(1/256).listen();
+		folder.add(tonesB, '_volume', .0001, 1).listen();
+		folder.add(tonesB, '_attack', .0001, 2).listen();
+		folder.add(tonesB, '_release', .0001, 2).listen();
 		folder.add( { waveform:'Square' }, 'waveform', allWaveNames).onChange(onWaveformSelect.bind(_, tonesB));
 		folder.open();
 		
@@ -140,9 +140,9 @@ class KeyboardControlled {
 			case 'volume':
 				t.volume = .01 + Math.random();
 			case 'attack':
-				t.attack = Math.random() * 2000;
+				t.attack = Math.random() * 2;
 			case 'release':
-				t.release = Math.random() * 2000;
+				t.release = Math.random() * 2;
 			case 'all': 
 				if (tIndex == -1) {
 					randomise(0, type);

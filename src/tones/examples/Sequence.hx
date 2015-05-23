@@ -16,8 +16,8 @@ class Sequence {
 		
 		tones			= new Tones();
 		tones.volume 	= .1;
-		tones.attack 	= 25;
-		tones.release 	= 1000;
+		tones.attack 	= .025;
+		tones.release 	= 1;
 		tones.type		= OscillatorType.SAWTOOTH;
 		
 		freqUtil = new NoteFrequencyUtil();

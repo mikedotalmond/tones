@@ -1,6 +1,8 @@
 package tones.examples;
 
 import js.html.audio.AudioBuffer;
+import js.html.audio.AudioContext;
+import js.html.audio.GainNode;
 import js.html.XMLHttpRequestResponseType;
 
 import tones.Samples;
@@ -15,13 +17,29 @@ import js.html.XMLHttpRequest;
 class SamplesBasic {
 
 	
+	var tones:Tones;
 	var samples:Samples;
+	
 	var restartId:Int;
 	var buffer:AudioBuffer;
+	var outGain:GainNode;
+	var ctx:AudioContext;
 	
 	public function new() {
 		
-		samples = new Samples();
+		ctx = Samples.createContext();
+		
+		outGain = ctx.createGain();
+		outGain.gain.value = .7;
+		outGain.connect(ctx.destination);
+		
+		tones = new Tones(ctx, outGain);
+		tones.type = OscillatorType.SAWTOOTH;
+		tones.attack = 0.01;
+		tones.release = .5;
+		tones.volume = .2;
+		
+		samples = new Samples(ctx, outGain);
 		samples.sampleBegin.connect(onSampleBegin);
 		
 		var request = new XMLHttpRequest();
@@ -47,26 +65,39 @@ class SamplesBasic {
 		samples.playSample(buffer, .5); 
 	}
 	
-	function onSampleBegin(id:Int, poly:Int) {
+	function onSampleBegin(id:Int, time:Float) {
+		
+		trace('sample $id starts at $time (in ${time - ctx.currentTime})');
+		
 		if (id == restartId) {
-			playSequence();
+			var delay = time - ctx.currentTime;
+			if (delay < 0) delay = 0;
+			playSequence(delay);
 		}
 	}
 	
-	function playSequence() {
-		samples.playSample(buffer, TimeUtil.stepTime(1)); 
-		samples.playSample(buffer, TimeUtil.stepTime(2)); 
-		samples.playSample(buffer, TimeUtil.stepTime(3)); 
-		samples.playSample(buffer, TimeUtil.stepTime(4)); 
-		samples.playSample(buffer, TimeUtil.stepTime(5)); 
-		samples.playSample(buffer, TimeUtil.stepTime(6)); 
-		samples.playSample(buffer, TimeUtil.stepTime(6.25)); 
-		samples.playSample(buffer, TimeUtil.stepTime(6.5)); 
-		samples.playSample(buffer, TimeUtil.stepTime(6.75)); 
-		samples.playSample(buffer, TimeUtil.stepTime(7)); 
-		samples.playSample(buffer, TimeUtil.stepTime(7.25)); 
-		samples.playSample(buffer, TimeUtil.stepTime(7.5)); 
-		samples.playSample(buffer, TimeUtil.stepTime(7.75));
-		restartId = samples.playSample(buffer, TimeUtil.stepTime(8));
+	function playSequence(delay:Float=0) {
+		
+		tones.volume = .05;
+		tones.playFrequency(110, delay+TimeUtil.stepTime(1.5));
+		tones.playFrequency(110, delay+TimeUtil.stepTime(4));
+		tones.playFrequency(110, delay+TimeUtil.stepTime(4.5));
+		tones.playFrequency(110, delay+TimeUtil.stepTime(6));
+		tones.playFrequency(110, delay+TimeUtil.stepTime(7.5));
+		
+		samples.playSample(buffer, delay + TimeUtil.stepTime(1)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(2)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(3)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(4)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(5)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(6)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(6.25)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(6.5)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(6.75)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(7)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(7.25)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(7.5)); 
+		samples.playSample(buffer, delay + TimeUtil.stepTime(7.75));
+		restartId = samples.playSample(buffer, delay + TimeUtil.stepTime(8));
 	}
 }

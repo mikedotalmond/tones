@@ -153,6 +153,7 @@ class Tones {
 		
 		activeTones.set(id, { id:id, osc:osc, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 		
+		
 		// The tone won't actually begin now if there's a delay set... 
 		// if only there were a way to get a callback or event to fire at a specific audio conext time...
 		if (delayBy == 0) triggerToneBegin(id);
@@ -248,13 +249,13 @@ class Tones {
 	
 	inline function get_attack():Float return _attack;
 	function set_attack(value:Float):Float {
-		if (value < 0.0001) value = 0.0001;
+		if (value < 0.001) value = 0.001;
 		return _attack = value;
 	}
 	
 	inline function get_release():Float return _release;
 	function set_release(value:Float):Float {
-		if (value < 0.0001) value = 0.0001;
+		if (value < 0.001) value = 0.001;
 		return _release = value;
 	}
 	
@@ -290,14 +291,14 @@ class Tones {
 		Browser.window.requestAnimationFrame(tick);
 		
 		var t = now();
-		var halfDt = (t - lastTime) / 2;
+		var dt = (t - lastTime) / 2;
 		lastTime = t;
 		
 		var j = 0;
 		var n = delayedBegin.length;
 		while (j < n) {
 			var item = delayedBegin[j];
-			if (t > item.time + halfDt) {
+			if (t+dt > item.time) {
 				triggerToneBegin(item.id);
 				delayedBegin.splice(j, 1);
 				n--;
@@ -310,7 +311,7 @@ class Tones {
 		n = delayedRelease.length;
 		while (j < n) {
 			var item = delayedRelease[j];
-			if (t > item.time + halfDt) {
+			if (t +dt> item.time) {
 				toneReleased.emit(item.id);
 				delayedRelease.splice(j, 1);
 				n--;
@@ -323,7 +324,7 @@ class Tones {
 		n = delayedEnd.length;
 		while (j < n) {
 			var item = delayedEnd[j];
-			if (t > item.time + halfDt) {
+			if (t + dt > item.time) {
 				doStop(item.id);
 				delayedEnd.splice(j, 1);
 				n--;

@@ -41,9 +41,9 @@ class Samples {
 	public var lastId		(default, null):Int;
 	public var polyphony	(default, null):Int;
 	public var activeSamples(default, null):Map<Int, SampleData>;
-	public var sampleBegin	(default, null):Signal<Int->Int->Void>;
-	public var sampleEnd	(default, null):Signal<Int->Int->Void>;
-	public var sampleRelease(default, null):Signal<Int->Void>;
+	public var sampleBegin	(default, null):Signal<Int->Float->Void>;
+	public var sampleRelease(default, null):Signal<Int->Float->Void>;
+	public var sampleEnd	(default, null):Signal<Int->Void>;
 	
 	var ID:Int = 0;
 	var _attack:Float;
@@ -78,9 +78,9 @@ class Samples {
 		lastId = ID;
 		polyphony = 0;
 		activeSamples = new Map<Int, SampleData>();
-		sampleRelease = new Signal<Int->Void>();
-		sampleBegin = new Signal<Int->Int->Void>();
-		sampleEnd = new Signal<Int->Int->Void>();
+		sampleRelease = new Signal<Int->Float->Void>();
+		sampleBegin = new Signal<Int->Float->Void>();
+		sampleEnd = new Signal<Int->Void>();
 		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
 		// (apparently about 4096 samples worth of data (1 buffer perhaps?))
 		// If I use context.currentTime the setTargetAtTime will not fade-out, it just ends aruptly.  
@@ -95,14 +95,14 @@ class Samples {
 		playbackRate = 1.0;
 		
 		#if debug
-		sampleBegin.connect(function(id, poly) {
-			trace('sampleBegin | id:$id, polyphony:$poly, time:${now()}');
+		sampleBegin.connect(function(id, time) {
+			trace('sampleBegin | id:$id, time:$time');
 		});		
-		sampleRelease.connect(function(id) {
-			trace('sampleRelease | id:$id, time:${now()}');
+		sampleRelease.connect(function(id, time) {
+			trace('sampleRelease | id:$id, time:$time');
 		});
-		sampleEnd.connect(function(id, poly) {
-			trace('sampleEnd | id:$id, polyphony:$poly, time:${now()}');
+		sampleEnd.connect(function(id) {
+			trace('sampleEnd | id:$id, time:${now()}');
 		});
 		#end
 		
@@ -146,7 +146,7 @@ class Samples {
 		
 		activeSamples.set(id, { id:id, src:src, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 		
-		if (delayBy == .0) triggerSampleBegin(id);
+		if (delayBy == .0) triggerSampleBegin(id, triggerTime);
 		else delayedBegin.push({id:id, time:triggerTime});
 		
 		if (autoRelease) doRelease(id, releaseTime);
@@ -183,7 +183,7 @@ class Samples {
 		var dt = time - nowTime;
 		
 		if (dt > 0) delayedRelease.push( { id:id, time:time } );
-		else sampleRelease.emit(id);
+		else sampleRelease.emit(id, nowTime);
 		
 		data.env.gain.cancelScheduledValues(time);
 		data.env.gain.setTargetAtTime(0, time, getTimeConstant(release));
@@ -259,14 +259,14 @@ class Samples {
 	
 	
 	// internal
-	function triggerSampleBegin(id:Int):Void {
+	function triggerSampleBegin(id:Int, time:Float):Void {
 		polyphony++;
-		sampleBegin.emit(id, polyphony);
+		sampleBegin.emit(id, time);
 	}
 	
 	function triggerSampleEnd(id:Int):Void {
 		polyphony--;
-		sampleEnd.emit(id, polyphony);
+		sampleEnd.emit(id);
 	}
 	
 	
@@ -281,15 +281,20 @@ class Samples {
 		Browser.window.requestAnimationFrame(tick);
 		
 		var t = now();
-		var halfDt = (t - lastTime) / 2;
+		var dt = t - lastTime;
 		lastTime = t;
+		
+		var nextTime = t + dt*2;
+		// Estimated 'next+1' frame-time
+		// If an audio event is going to happen between frames, then we want to make sure the signal is triggered beforehand.
+		// Passing the actual audio context time of the event in the signal being triggered should allow for accurate sync. 
 		
 		var j = 0;
 		var n = delayedBegin.length;
 		while (j < n) {
 			var item = delayedBegin[j];
-			if (t > item.time + halfDt) {
-				triggerSampleBegin(item.id);
+			if (nextTime > item.time) {
+				triggerSampleBegin(item.id, item.time);
 				delayedBegin.splice(j, 1);
 				n--;
 			} else {
@@ -301,8 +306,8 @@ class Samples {
 		n = delayedRelease.length;
 		while (j < n) {
 			var item = delayedRelease[j];
-			if (t > item.time + halfDt) {
-				sampleRelease.emit(item.id);
+			if (nextTime > item.time) {
+				sampleRelease.emit(item.id, item.time);
 				delayedRelease.splice(j, 1);
 				n--;
 			} else {
@@ -314,7 +319,7 @@ class Samples {
 		n = delayedEnd.length;
 		while (j < n) {
 			var item = delayedEnd[j];
-			if (t > item.time + halfDt) {
+			if (t >= item.time) {
 				doStop(item.id);
 				delayedEnd.splice(j, 1);
 				n--;

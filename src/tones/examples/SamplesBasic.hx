@@ -34,7 +34,7 @@ class SamplesBasic {
 		outGain.connect(ctx.destination);
 		
 		tones = new Tones(ctx, outGain);
-		tones.type = OscillatorType.SAWTOOTH;
+		tones.type = OscillatorType.SQUARE;
 		tones.attack = 0.01;
 		tones.release = .5;
 		tones.volume = .2;
@@ -79,11 +79,11 @@ class SamplesBasic {
 	function playSequence(delay:Float=0) {
 		
 		tones.volume = .05;
-		tones.playFrequency(110, delay+TimeUtil.stepTime(1.5));
+		tones.playFrequency(55, delay+TimeUtil.stepTime(1.5));
 		tones.playFrequency(110, delay+TimeUtil.stepTime(4));
-		tones.playFrequency(110, delay+TimeUtil.stepTime(4.5));
+		tones.playFrequency(55, delay+TimeUtil.stepTime(4.5));
 		tones.playFrequency(110, delay+TimeUtil.stepTime(6));
-		tones.playFrequency(110, delay+TimeUtil.stepTime(7.5));
+		tones.playFrequency(55, delay+TimeUtil.stepTime(7.5));
 		
 		samples.playSample(buffer, delay + TimeUtil.stepTime(1)); 
 		samples.playSample(buffer, delay + TimeUtil.stepTime(2)); 

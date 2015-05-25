@@ -39,13 +39,13 @@ class RandomSequence {
 		tones.playFrequency(freq, delay);
 	}
 	
-	function onToneBegin(id:Int, polyphony:Int) {
+	function onToneBegin(id:Int, time:Float) {
 		// a tone has just started to play,
 		// if the current polyphony (number of active tones) is less than 3 - play another
-		if (polyphony < 3) playRandom(); 
+		if (tones.polyphony < 3) playRandom(); 
 	}
 	
-	function onToneEnd(id:Int, polyphony:Int) {
-		if (polyphony < 3) playRandom(); // play again as soon as a tone has ended - this will keep it playing forever!
+	function onToneEnd(id:Int) {
+		if (tones.polyphony < 3) playRandom(); // play again as soon as a tone has ended - this will keep it playing forever!
 	}
 }

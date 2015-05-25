@@ -27,7 +27,7 @@ class FreqSlide {
 		tones.playFrequency(220, .5, false);
 	}
 	
-	function onToneStart(id, poly) {
+	function onToneStart(id, time) {
 		var data:ToneData = tones.getToneData(id);
 		// a note started...
 		// slide to a value in the range of 20-440Hz, over ~1 second
@@ -35,7 +35,7 @@ class FreqSlide {
 		tones.releaseAfter(id, 1); // release after 1 second
 	}
 	
-	function onToneReleased(id) {
+	function onToneReleased(id, time) {
 		var data:ToneData = tones.getToneData(id);
 		// a note was released, play another, starting at the frequency of the last note...
 		tones.playFrequency(data.osc.frequency.value , 0, false);

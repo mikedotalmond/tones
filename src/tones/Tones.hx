@@ -36,7 +36,6 @@ class Tones {
 	public var context(default, null):AudioContext;
 	public var destination(default, null):AudioNode;
 	
-	
 	public var type:OscillatorType;	
 	public var customWave:PeriodicWave = null;
 	
@@ -46,9 +45,9 @@ class Tones {
 	
 	public var polyphony	(default, null):Int;
 	public var activeTones	(default, null):Map<Int, ToneData>;
-	public var toneBegin	(default, null):Signal<Int->Int->Void>;
-	public var toneEnd		(default, null):Signal<Int->Int->Void>;
-	public var toneReleased	(default, null):Signal<Int->Void>;
+	public var toneBegin	(default, null):Signal<Int->Float->Void>;
+	public var toneReleased	(default, null):Signal<Int->Float->Void>;
+	public var toneEnd		(default, null):Signal<Int->Void>;
 	
 	
 	var ID:Int = 0;
@@ -82,9 +81,9 @@ class Tones {
 		
 		polyphony = 0;
 		activeTones = new Map<Int, ToneData>();
-		toneReleased = new Signal<Int->Void>();
-		toneBegin = new Signal<Int->Int->Void>();
-		toneEnd = new Signal<Int->Int->Void>();
+		toneReleased = new Signal<Int->Float->Void>();
+		toneBegin = new Signal<Int->Float->Void>();
+		toneEnd = new Signal<Int->Void>();
 		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
 		// (apparently about 4096 samples worth of data (1 buffer perhaps?))
 		// If I use context.currentTime the setTargetAtTime will not fade-out, it just ends aruptly.  
@@ -99,14 +98,14 @@ class Tones {
 		volume 	= .1;
 		
 		#if debug
-		toneBegin.connect(function(id, poly) {
-			trace('toneBegin | id:$id, polyphony:$poly, time:${now()}');
+		toneBegin.connect(function(id, time) {
+			trace('toneBegin | id:$id, time:$time');
 		});		
-		toneReleased.connect(function(id) {
-			trace('toneReleased | id:$id, time:${now()}');
+		toneReleased.connect(function(id, time) {
+			trace('toneReleased | id:$id, time:$time');
 		});
-		toneEnd.connect(function(id, poly) {
-			trace('toneEnd | id:$id, polyphony:$poly, time:${now()}');
+		toneEnd.connect(function(id) {
+			trace('toneEnd | id:$id, time:${now()}');
 		});
 		#end
 		
@@ -156,7 +155,7 @@ class Tones {
 		
 		// The tone won't actually begin now if there's a delay set... 
 		// if only there were a way to get a callback or event to fire at a specific audio conext time...
-		if (delayBy == 0) triggerToneBegin(id);
+		if (delayBy == 0) triggerToneBegin(id, triggerTime);
 		else delayedBegin.push( { id:id, time:triggerTime } );		
 		if (autoRelease) doRelease(id, releaseTime);
 		
@@ -192,7 +191,7 @@ class Tones {
 		var dt = time - nowTime;
 		
 		if (dt > 0) delayedRelease.push( { id:id, time:time } );
-		else toneReleased.emit(id);
+		else toneReleased.emit(id, time);
 		
 		data.env.gain.cancelScheduledValues(time);
 		data.env.gain.setTargetAtTime(0, time, getTimeConstant(data.release));
@@ -268,14 +267,14 @@ class Tones {
 	
 	
 	// internal
-	function triggerToneBegin(id:Int):Void {
+	function triggerToneBegin(id:Int, time:Float):Void {
 		polyphony++;
-		toneBegin.emit(id, polyphony);
+		toneBegin.emit(id, time);
 	}
 	
 	function triggerToneEnd(id:Int):Void {
 		polyphony--;
-		toneEnd.emit(id, polyphony);
+		toneEnd.emit(id);
 	}
 	
 	
@@ -291,15 +290,20 @@ class Tones {
 		Browser.window.requestAnimationFrame(tick);
 		
 		var t = now();
-		var dt = (t - lastTime) / 2;
+		var dt = t - lastTime;
 		lastTime = t;
+		
+		var nextTime = t + dt * 2;
+		// Estimated 'next+1' frame-time
+		// If an audio event is going to happen between frames, then we want to make sure the signal is triggered beforehand.
+		// Passing the actual audio context time of the event in the signal being triggered should allow for accurate sync. 
 		
 		var j = 0;
 		var n = delayedBegin.length;
 		while (j < n) {
 			var item = delayedBegin[j];
-			if (t+dt > item.time) {
-				triggerToneBegin(item.id);
+			if (nextTime > item.time) {
+				triggerToneBegin(item.id, item.time);
 				delayedBegin.splice(j, 1);
 				n--;
 			} else {
@@ -311,8 +315,8 @@ class Tones {
 		n = delayedRelease.length;
 		while (j < n) {
 			var item = delayedRelease[j];
-			if (t +dt> item.time) {
-				toneReleased.emit(item.id);
+			if (nextTime > item.time) {
+				toneReleased.emit(item.id, item.time);
 				delayedRelease.splice(j, 1);
 				n--;
 			} else {
@@ -324,7 +328,7 @@ class Tones {
 		n = delayedEnd.length;
 		while (j < n) {
 			var item = delayedEnd[j];
-			if (t + dt > item.time) {
+			if (t >= item.time) {
 				doStop(item.id);
 				delayedEnd.splice(j, 1);
 				n--;

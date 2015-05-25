@@ -30,11 +30,10 @@ class Samples {
 	public var context(default, null):AudioContext;
 	public var destination(default, null):AudioNode;
 	
-	
 	public var buffer:AudioBuffer = null;
 	
-	public var attack	(get, set):Float; // milliseconds
-	public var release	(get, set):Float; // milliseconds
+	public var attack	(get, set):Float; // seconds
+	public var release	(get, set):Float; // seconds
 	public var volume	(get, set):Float;
 	public var playbackRate:Float;
 	

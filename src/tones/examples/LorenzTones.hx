@@ -61,8 +61,8 @@ class LorenzTones {
 		setupUI();
 	}
 	
-	function onToneStart(id, poly) {
-		if (poly == 3) {
+	function onToneStart(id, time) {
+		if (tones.polyphony == 3) {
 			osc1 = tones.getToneData(0).osc;
 			osc2 = tones.getToneData(1).osc;
 			osc3 = tones.getToneData(2).osc;

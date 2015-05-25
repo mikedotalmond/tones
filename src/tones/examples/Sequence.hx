@@ -1,5 +1,6 @@
 package tones.examples;
 import tones.utils.NoteFrequencyUtil;
+import tones.utils.TimeUtil;
 
 /**
  * ...
@@ -23,53 +24,48 @@ class Sequence {
 		freqUtil = new NoteFrequencyUtil();
 		lastNoteId = -1;
 		
-		// simplest case - use delays to sequence	
-		tones.toneEnd.connect(function(id, poly) {
-			// every now and then, based on the current polyphony, play a random note on the off-beat between the sequenced notes.
-			var r = 2 + Std.int(Math.random() * 12);
-			if (poly == r) {
-				tones.volume = .05;
-				var octave = 1 + Std.int(Math.random() * 3);
-				var note = NoteFrequencyUtil.pitchNames[Std.int(Math.random() * 12)];
-				tones.playFrequency(freqUtil.noteNameToFrequency('$note$octave'), .1);
-			}
+		tones.toneBegin.connect(function(id, time) {
 			
-			// could get into some fun sequence generation by using the current polyphony
-			// and the id of a tone that ended to decice if a new one should play... 
-			// .. if(id%3==0)
-		});
-		
-		tones.toneBegin.connect(function(id, poly) {
+			// time is the audioContext time that this tone starts at 
+			// - can/will be a little bit in the future,
+			// use it to get a sample accurate sync 
+			
 			if (id == lastNoteId) { 
-				// last note was triggered? 
-				// restart the sequence - the last note doubles up with the first in this loop.
 				trace('repeat');
-				playSequence();
+				// last note was triggered - restart the sequence.
+				// the last note doubles up with the first in this loop.
+				playSequence(time);
+			} else {
+				// intersperse the repeating pattern with some random off-beat notes
+				var r = 2 + Std.int(Math.random() * 12);
+				if (tones.polyphony == r) {
+					tones.volume = .05;
+					var octave = 1 + Std.int(Math.random() * 3);
+					var note = NoteFrequencyUtil.pitchNames[Std.int(Math.random() * 12)];
+					tones.playFrequency(freqUtil.noteNameToFrequency('$note$octave'), time-tones.now() + TimeUtil.stepTime(.25));
+				}
 			}
 		});
 		
-		playSequence();
+		playSequence(tones.now());
 	}
 	
-	function playSequence() {
-			
-		tones.volume = .05;
-		tones.playFrequency(freqUtil.noteNameToFrequency('C3'), 0);
-		tones.playFrequency(freqUtil.noteNameToFrequency('C4'), .2);
-		tones.playFrequency(freqUtil.noteNameToFrequency('C5'), .4);
+	
+	function playSequence(time:Float) {
 		
-		tones.volume *= .9;
-		tones.playFrequency(freqUtil.noteNameToFrequency('G3'), .8);
-		tones.volume *= .8;
-		tones.playFrequency(freqUtil.noteNameToFrequency('G4'), 1);
-		tones.volume *= .7;
-		tones.playFrequency(freqUtil.noteNameToFrequency('G5'), 1.2);
-		
-		tones.volume = .08;
-		tones.playFrequency(freqUtil.noteNameToFrequency('G2'), 1);
-		tones.playFrequency(freqUtil.noteNameToFrequency('G1'), 1.2);
+		var start =	time - tones.now();
 		
 		tones.volume = .05;
-		lastNoteId = tones.playFrequency(freqUtil.noteNameToFrequency('C1'), 1.4);
+		tones.playFrequency(freqUtil.noteNameToFrequency('C3'), start);
+		tones.playFrequency(freqUtil.noteNameToFrequency('C4'), start + TimeUtil.stepTime(.5));
+		tones.playFrequency(freqUtil.noteNameToFrequency('C5'), start + TimeUtil.stepTime(1));
+		
+		tones.playFrequency(freqUtil.noteNameToFrequency('G3'), start + TimeUtil.stepTime(2));
+		tones.playFrequency(freqUtil.noteNameToFrequency('G4'), start + TimeUtil.stepTime(2.5));
+		tones.playFrequency(freqUtil.noteNameToFrequency('G5'), start + TimeUtil.stepTime(3));
+		
+		// loop point..
+		tones.playFrequency(freqUtil.noteNameToFrequency('G2'), start + TimeUtil.stepTime(4));
+		lastNoteId = tones.playFrequency(freqUtil.noteNameToFrequency('C2'), start + TimeUtil.stepTime(4));
 	}
 }

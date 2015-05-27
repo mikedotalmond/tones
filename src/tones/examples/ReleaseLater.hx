@@ -1,6 +1,6 @@
 package tones.examples;
 import haxe.Timer;
-
+import tones.data.OscillatorType;
 /**
  * ...
  * @author Mike Almond - https://github.com/mikedotalmond

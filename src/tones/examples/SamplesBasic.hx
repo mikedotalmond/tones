@@ -8,6 +8,7 @@ import js.html.XMLHttpRequestResponseType;
 import tones.Samples;
 import tones.utils.NoteFrequencyUtil;
 import tones.utils.TimeUtil;
+import tones.data.OscillatorType;
 
 import js.html.XMLHttpRequest;
 /**
@@ -27,7 +28,7 @@ class SamplesBasic {
 	
 	public function new() {
 		
-		ctx = Samples.createContext();
+		ctx = AudioBase.createContext();
 		
 		outGain = ctx.createGain();
 		outGain.gain.value = .7;
@@ -40,7 +41,7 @@ class SamplesBasic {
 		tones.volume = .2;
 		
 		samples = new Samples(ctx, outGain);
-		samples.sampleBegin.connect(onSampleBegin);
+		samples.itemBegin.connect(onSampleBegin);
 		
 		var request = new XMLHttpRequest();
 		request.open("GET", 'data/samples/kick.wav', true);

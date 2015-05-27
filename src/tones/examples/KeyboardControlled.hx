@@ -7,7 +7,7 @@ import js.html.audio.AudioContext;
 import js.html.audio.GainNode;
 import js.html.KeyboardEvent;
 import js.html.SelectElement;
-import tones.OscillatorType;
+import tones.data.OscillatorType;
 import tones.Tones;
 import tones.utils.KeyboardInput;
 import tones.utils.KeyboardNotes;
@@ -46,7 +46,7 @@ class KeyboardControlled {
 		
 		// share a single context across 2 tones instances
 		// (could just as well be sharing with an effects library or other any other webaudio project really)
-		context = Tones.createContext();
+		context = AudioBase.createContext();
 		
 		// Here the destination for both Toens is a single output gain... you could just as easily route them to diffrerent destinations
 		// and apply effects (dynamics, filters, spatial positioning,.. anything), to each before routing them to the destination.

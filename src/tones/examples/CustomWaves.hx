@@ -2,15 +2,14 @@ package tones.examples;
 
 import haxe.Timer;
 import hxsignal.Signal.ConnectionTimes;
-import js.html.KeyboardEvent;
-import tones.utils.NoteFrequencyUtil;
-
 import js.Browser;
-import js.html.audio.PeriodicWave;
+import js.html.KeyboardEvent;
 import js.html.MouseEvent;
-
-import tones.OscillatorType;
+import tones.utils.NoteFrequencyUtil;
 import tones.utils.Wavetables;
+import tones.data.OscillatorType;
+
+
 
 /**
  * ...

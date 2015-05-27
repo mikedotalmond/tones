@@ -1,4 +1,4 @@
-package tones;
+package tones.data;
 
 /**
  * ...

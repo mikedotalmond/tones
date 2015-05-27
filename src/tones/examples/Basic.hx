@@ -5,7 +5,7 @@ import haxe.Timer;
 import js.Browser;
 import tones.Tones;
 
-import tones.OscillatorType;
+import tones.data.OscillatorType;
 import tones.utils.NoteFrequencyUtil;
 
 /**

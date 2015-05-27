@@ -2,6 +2,7 @@ package tones.examples;
 
 import js.html.audio.PanningModelType;
 import tones.Tones;
+import tones.data.OscillatorType;
 
 import js.html.audio.PannerNode;
 import js.html.audio.AudioContext;
@@ -16,7 +17,7 @@ class SharedContext {
 
 	public function new() {
 		
-		context = Tones.createContext();
+		context = AudioBase.createContext();
 		
 		var pan1 = context.createPanner();
 		var pan2 = context.createPanner();

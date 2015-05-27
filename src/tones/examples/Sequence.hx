@@ -2,6 +2,7 @@ package tones.examples;
 import tones.utils.NoteFrequencyUtil;
 import tones.utils.TimeUtil;
 
+import tones.data.OscillatorType;
 /**
  * ...
  * @author Mike Almond - https://github.com/mikedotalmond
@@ -24,11 +25,11 @@ class Sequence {
 		freqUtil = new NoteFrequencyUtil();
 		lastNoteId = -1;
 		
-		tones.toneBegin.connect(function(id, time) {
+		tones.itemBegin.connect(function(id, time) {
 			
 			// time is the audioContext time that this tone starts at 
 			// - can/will be a little bit in the future,
-			// use it to get a sample accurate sync 
+			// use it to get a accurate sync 
 			
 			if (id == lastNoteId) { 
 				trace('repeat');
@@ -37,23 +38,23 @@ class Sequence {
 				playSequence(time);
 			} else {
 				// intersperse the repeating pattern with some random off-beat notes
-				var r = 2 + Std.int(Math.random() * 12);
+				var r = 2 + Std.int(Math.random() * 10);
 				if (tones.polyphony == r) {
 					tones.volume = .05;
 					var octave = 1 + Std.int(Math.random() * 3);
 					var note = NoteFrequencyUtil.pitchNames[Std.int(Math.random() * 12)];
-					tones.playFrequency(freqUtil.noteNameToFrequency('$note$octave'), time-tones.now() + TimeUtil.stepTime(.25));
+					tones.playFrequency(freqUtil.noteNameToFrequency('$note$octave'), time-tones.now + TimeUtil.stepTime(.25));
 				}
 			}
 		});
 		
-		playSequence(tones.now());
+		playSequence(tones.now);
 	}
 	
 	
 	function playSequence(time:Float) {
 		
-		var start =	time - tones.now();
+		var start =	time - tones.now;
 		
 		tones.volume = .05;
 		tones.playFrequency(freqUtil.noteNameToFrequency('C3'), start);

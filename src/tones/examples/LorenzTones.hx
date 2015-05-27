@@ -6,6 +6,8 @@ import js.html.audio.OscillatorNode;
 import js.html.Float32Array;
 import js.Browser;
 import tones.Tones;
+import tones.utils.TimeUtil;
+import tones.data.OscillatorType;
 
 /**
  * ...
@@ -40,14 +42,14 @@ class LorenzTones {
 			Math.POSITIVE_INFINITY, Math.NEGATIVE_INFINITY, //z
 		]);
 	
-		var c = Tones.createContext();
+		var c = AudioBase.createContext();
 		
 		masterGain = c.createGain();
 		masterGain.gain.value = .75;
 		masterGain.connect(c.destination);
 		
 		tones = new Tones(c, masterGain); 
-		tones.toneBegin.connect(onToneStart);
+		tones.itemBegin.connect(onToneStart);
 		
 		// change some settings...
 		tones.type = OscillatorType.TRIANGLE;
@@ -63,9 +65,9 @@ class LorenzTones {
 	
 	function onToneStart(id, time) {
 		if (tones.polyphony == 3) {
-			osc1 = tones.getToneData(0).osc;
-			osc2 = tones.getToneData(1).osc;
-			osc3 = tones.getToneData(2).osc;
+			osc1 = cast tones.getItemData(0).src;
+			osc2 = cast tones.getItemData(1).src;
+			osc3 = cast tones.getItemData(2).src;
 			Browser.window.requestAnimationFrame(enterFrame);
 		}
 	}
@@ -104,7 +106,7 @@ class LorenzTones {
 		osc3.frequency.cancelScheduledValues(now);
 		
 		var range = (freqHigh - freqLow);
-		var tc = Tones.getTimeConstant(dt / 1000);
+		var tc = TimeUtil.getTimeConstant(dt / 1000);
 		osc1.frequency.setTargetAtTime(freqLow + x * range, now, tc);
 		osc2.frequency.setTargetAtTime(freqLow + y * range, now, tc);
 		osc3.frequency.setTargetAtTime(freqLow + z * range, now, tc);

@@ -807,47 +807,165 @@ js_Browser.createXMLHttpRequest = function() {
 	if(typeof ActiveXObject != "undefined") return new ActiveXObject("Microsoft.XMLHTTP");
 	throw new js__$Boot_HaxeError("Unable to create XMLHttpRequest object.");
 };
-var tones_OscillatorTypeShim = function() { };
-tones_OscillatorTypeShim.__name__ = true;
-var tones_Samples = function(audioContext,destinationNode) {
+var tones_AudioBase = function(audioContext,destinationNode) {
 	this.lastTime = .0;
 	this.ID = 0;
 	var _g = this;
-	if(audioContext == null) this.context = tones_Tones.createContext(); else this.context = audioContext;
+	if(audioContext == null) this.context = tones_AudioBase.createContext(); else this.context = audioContext;
 	if(destinationNode == null) this.destination = this.context.destination; else this.destination = destinationNode;
 	this.delayedBegin = [];
 	this.delayedRelease = [];
 	this.delayedEnd = [];
+	this.timedEvents = [];
 	this.lastId = this.ID;
 	this.polyphony = 0;
-	this.activeSamples = new haxe_ds_IntMap();
-	this.sampleRelease = new hxsignal_impl_Signal1();
-	this.sampleBegin = new hxsignal_impl_Signal2();
-	this.sampleEnd = new hxsignal_impl_Signal2();
+	this.activeItems = new haxe_ds_IntMap();
+	this.itemRelease = new hxsignal_impl_Signal2();
+	this.itemBegin = new hxsignal_impl_Signal2();
+	this.itemEnd = new hxsignal_impl_Signal1();
+	this.timedEvent = new hxsignal_impl_Signal2();
 	this.releaseFudge = window.navigator.userAgent.indexOf("Firefox") > -1?4096 / this.context.sampleRate:0;
 	this.set_attack(0.0);
 	this.set_release(1.0);
 	this.set_volume(.2);
+	this.itemBegin.connect(function(id,time) {
+		console.log("itemBegin | id:" + id + ", time:" + time);
+	});
+	this.itemRelease.connect(function(id1,time1) {
+		console.log("itemRelease | id:" + id1 + ", time:" + time1);
+	});
+	this.itemEnd.connect(function(id2) {
+		console.log("itemEnd | id:" + id2 + ", time:" + _g.context.currentTime);
+	});
+	this.timedEvent.connect(function(id3,time2) {
+		console.log("timedEvent | id:" + id3 + ", time:" + time2);
+	});
+	tones_utils_TimeUtil.get_frameTick().connect($bind(this,this.tick));
+};
+tones_AudioBase.__name__ = true;
+tones_AudioBase.createContext = function() {
+	return new (window.AudioContext || window.webkitAudioContext)();
+};
+tones_AudioBase.prototype = {
+	releaseAfter: function(id,delay) {
+		this.doRelease(id,this.context.currentTime + delay);
+	}
+	,doRelease: function(id,atTime) {
+		if(atTime == null) atTime = -1;
+		var data = this.activeItems.h[id];
+		if(data == null) return;
+		var time;
+		var nowTime = this.context.currentTime;
+		if(atTime < nowTime) time = nowTime; else time = atTime;
+		time += this.releaseFudge;
+		var dt = time - nowTime;
+		if(dt > 0) this.delayedRelease.push({ id : id, time : time}); else this.itemRelease.emit(id,nowTime);
+		data.env.gain.cancelScheduledValues(time);
+		data.env.gain.setTargetAtTime(0,time,Math.log(this._release + 1.0) / 4.605170185988092);
+		this.delayedEnd.push({ id : id, time : time + this._release});
+	}
+	,releaseAll: function(atTime) {
+		if(atTime == null) atTime = -1;
+		var $it0 = this.activeItems.keys();
+		while( $it0.hasNext() ) {
+			var id = $it0.next();
+			this.doRelease(id,atTime);
+		}
+	}
+	,doStop: function(id) {
+		var data = this.activeItems.h[id];
+		if(data == null) return;
+		data.src.stop(this.context.currentTime);
+		data.src.disconnect();
+		data.env.gain.cancelScheduledValues(this.context.currentTime);
+		data.env.disconnect();
+		this.triggerItemEnd(id);
+		this.activeItems.remove(id);
+	}
+	,set_attack: function(value) {
+		if(value < 0.001) value = 0.001;
+		return this._attack = value;
+	}
+	,set_release: function(value) {
+		if(value < 0.001) value = 0.001;
+		return this._release = value;
+	}
+	,set_volume: function(value) {
+		if(value < 0) value = 0; else if(value > 1) value = 1;
+		return this._volume = value;
+	}
+	,triggerItemBegin: function(id,time) {
+		this.polyphony++;
+		this.itemBegin.emit(id,time);
+	}
+	,triggerItemEnd: function(id) {
+		this.polyphony--;
+		this.itemEnd.emit(id);
+	}
+	,tick: function(_) {
+		var t = this.context.currentTime;
+		var dt = t - this.lastTime;
+		this.lastTime = t;
+		var nextTime = t + dt * 2;
+		var j = 0;
+		var n = this.delayedBegin.length;
+		while(j < n) {
+			var item = this.delayedBegin[j];
+			if(nextTime > item.time) {
+				this.triggerItemBegin(item.id,item.time);
+				this.delayedBegin.splice(j,1);
+				n--;
+			} else j++;
+		}
+		j = 0;
+		n = this.delayedRelease.length;
+		while(j < n) {
+			var item1 = this.delayedRelease[j];
+			if(nextTime > item1.time) {
+				this.itemRelease.emit(item1.id,item1.time);
+				this.delayedRelease.splice(j,1);
+				n--;
+			} else j++;
+		}
+		var j1 = 0;
+		var n1 = this.timedEvents.length;
+		while(j1 < n1) {
+			var item2 = this.timedEvents[j1];
+			if(nextTime > item2.time) {
+				this.timedEvent.emit(item2.id,item2.time);
+				this.timedEvents.splice(j1,1);
+				n1--;
+			} else j1++;
+		}
+		j1 = 0;
+		n1 = this.delayedEnd.length;
+		while(j1 < n1) {
+			var item3 = this.delayedEnd[j1];
+			if(t >= item3.time) {
+				this.doStop(item3.id);
+				this.delayedEnd.splice(j1,1);
+				n1--;
+			} else j1++;
+		}
+	}
+	,__class__: tones_AudioBase
+};
+var tones_Samples = function(audioContext,destinationNode) {
+	tones_AudioBase.call(this,audioContext,destinationNode);
 	this.playbackRate = 1.0;
-	this.sampleBegin.connect(function(id,poly) {
-		console.log("sampleBegin | id:" + id + ", polyphony:" + poly + ", time:" + _g.context.currentTime);
-	});
-	this.sampleRelease.connect(function(id1) {
-		console.log("sampleRelease | id:" + id1 + ", time:" + _g.context.currentTime);
-	});
-	this.sampleEnd.connect(function(id2,poly1) {
-		console.log("sampleEnd | id:" + id2 + ", polyphony:" + poly1 + ", time:" + _g.context.currentTime);
-	});
-	this.tick(.0);
 };
 tones_Samples.__name__ = true;
-tones_Samples.prototype = {
+tones_Samples.__super__ = tones_AudioBase;
+tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
 	playSample: function(buffer,delayBy,autoRelease) {
 		if(autoRelease == null) autoRelease = true;
 		if(delayBy == null) delayBy = .0;
-		var id = this.ID;
+		if(delayBy < 0) delayBy = 0;
+		var tmp;
+		this.lastId = this.ID;
 		this.ID++;
-		this.lastId = id;
+		tmp = this.lastId;
+		var id = tmp;
 		var envelope = this.context.createGain();
 		var triggerTime = this.context.currentTime + delayBy;
 		var releaseTime = triggerTime + this._attack;
@@ -859,134 +977,29 @@ tones_Samples.prototype = {
 		src.playbackRate.value = this.playbackRate;
 		src.connect(envelope);
 		src.start(triggerTime);
-		this.activeSamples.h[id] = { id : id, src : src, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
-		if(delayBy == .0) this.triggerSampleBegin(id); else this.delayedBegin.push({ id : id, time : triggerTime});
+		this.activeItems.h[id] = { id : id, src : src, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
+		if(delayBy == 0) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
 		if(autoRelease) this.doRelease(id,releaseTime);
 		return id;
 	}
-	,doRelease: function(id,atTime) {
-		if(atTime == null) atTime = -1;
-		var data = this.activeSamples.h[id];
-		if(data == null) return;
-		var time;
-		var nowTime = this.context.currentTime;
-		if(atTime < nowTime) time = nowTime; else time = atTime;
-		time += this.releaseFudge;
-		var dt = time - nowTime;
-		if(dt > 0) this.delayedRelease.push({ id : id, time : time}); else this.sampleRelease.emit(id);
-		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.setTargetAtTime(0,time,Math.log(this._release + 1.0) / 4.605170185988092);
-		this.delayedEnd.push({ id : id, time : time + this._release});
-	}
-	,doStop: function(id) {
-		var data = this.activeSamples.h[id];
-		if(data == null) return;
-		data.src.stop(this.context.currentTime);
-		data.src.disconnect();
-		data.env.gain.cancelScheduledValues(this.context.currentTime);
-		data.env.disconnect();
-		this.triggerSampleEnd(id);
-		this.activeSamples.remove(id);
-	}
-	,set_attack: function(value) {
-		if(value < 0.0001) value = 0.0001;
-		return this._attack = value;
-	}
-	,set_release: function(value) {
-		if(value < 0.0001) value = 0.0001;
-		return this._release = value;
-	}
-	,set_volume: function(value) {
-		if(value < 0) value = 0; else if(value > 1) value = 1;
-		return this._volume = value;
-	}
-	,triggerSampleBegin: function(id) {
-		this.polyphony++;
-		this.sampleBegin.emit(id,this.polyphony);
-	}
-	,triggerSampleEnd: function(id) {
-		this.polyphony--;
-		this.sampleEnd.emit(id,this.polyphony);
-	}
-	,tick: function(_) {
-		window.requestAnimationFrame($bind(this,this.tick));
-		var t = this.context.currentTime;
-		var halfDt = (t - this.lastTime) / 2;
-		this.lastTime = t;
-		var j = 0;
-		var n = this.delayedBegin.length;
-		while(j < n) {
-			var item = this.delayedBegin[j];
-			if(t > item.time + halfDt) {
-				this.triggerSampleBegin(item.id);
-				this.delayedBegin.splice(j,1);
-				n--;
-			} else j++;
-		}
-		j = 0;
-		n = this.delayedRelease.length;
-		while(j < n) {
-			var item1 = this.delayedRelease[j];
-			if(t > item1.time + halfDt) {
-				this.sampleRelease.emit(item1.id);
-				this.delayedRelease.splice(j,1);
-				n--;
-			} else j++;
-		}
-		j = 0;
-		n = this.delayedEnd.length;
-		while(j < n) {
-			var item2 = this.delayedEnd[j];
-			if(t > item2.time + halfDt) {
-				this.doStop(item2.id);
-				this.delayedEnd.splice(j,1);
-				n--;
-			} else j++;
-		}
-	}
 	,__class__: tones_Samples
-};
+});
 var tones_Tones = function(audioContext,destinationNode) {
-	this.lastTime = .0;
-	this.ID = 0;
 	this.customWave = null;
-	var _g = this;
-	if(audioContext == null) this.context = tones_Tones.createContext(); else this.context = audioContext;
-	if(destinationNode == null) this.destination = this.context.destination; else this.destination = destinationNode;
-	this.delayedBegin = [];
-	this.delayedRelease = [];
-	this.delayedEnd = [];
-	this.polyphony = 0;
-	this.activeTones = new haxe_ds_IntMap();
-	this.toneReleased = new hxsignal_impl_Signal1();
-	this.toneBegin = new hxsignal_impl_Signal2();
-	this.toneEnd = new hxsignal_impl_Signal2();
-	this.releaseFudge = window.navigator.userAgent.indexOf("Firefox") > -1?4096 / this.context.sampleRate:0;
+	tones_AudioBase.call(this,audioContext,destinationNode);
 	this.type = window.OscillatorTypeShim.SINE;
-	this.set_attack(.001);
-	this.set_release(.25);
-	this.set_volume(.1);
-	this.toneBegin.connect(function(id,poly) {
-		console.log("toneBegin | id:" + id + ", polyphony:" + poly + ", time:" + _g.context.currentTime);
-	});
-	this.toneReleased.connect(function(id1) {
-		console.log("toneReleased | id:" + id1 + ", time:" + _g.context.currentTime);
-	});
-	this.toneEnd.connect(function(id2,poly1) {
-		console.log("toneEnd | id:" + id2 + ", polyphony:" + poly1 + ", time:" + _g.context.currentTime);
-	});
-	this.tick(.0);
 };
 tones_Tones.__name__ = true;
-tones_Tones.createContext = function() {
-	return new (window.AudioContext || window.webkitAudioContext)();
-};
-tones_Tones.prototype = {
+tones_Tones.__super__ = tones_AudioBase;
+tones_Tones.prototype = $extend(tones_AudioBase.prototype,{
 	playFrequency: function(freq,delayBy,autoRelease) {
 		if(autoRelease == null) autoRelease = true;
 		if(delayBy == null) delayBy = .0;
-		var id = this.ID;
+		var tmp;
+		this.lastId = this.ID;
 		this.ID++;
+		tmp = this.lastId;
+		var id = tmp;
 		var envelope = this.context.createGain();
 		var triggerTime = this.context.currentTime + delayBy;
 		var releaseTime = triggerTime + this._attack;
@@ -998,104 +1011,15 @@ tones_Tones.prototype = {
 		osc.frequency.value = freq;
 		osc.connect(envelope);
 		osc.start(triggerTime);
-		this.activeTones.h[id] = { id : id, osc : osc, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
-		if(delayBy == 0) this.triggerToneBegin(id); else this.delayedBegin.push({ id : id, time : triggerTime});
+		this.activeItems.h[id] = { id : id, src : osc, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
+		if(delayBy == 0) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
 		if(autoRelease) this.doRelease(id,releaseTime);
 		return id;
 	}
-	,releaseAfter: function(id,delay) {
-		this.doRelease(id,this.context.currentTime + delay);
-	}
-	,doRelease: function(id,atTime) {
-		if(atTime == null) atTime = -1;
-		var data = this.activeTones.h[id];
-		if(data == null) return;
-		var time;
-		var nowTime = this.context.currentTime;
-		if(atTime < nowTime) time = nowTime; else time = atTime;
-		time += this.releaseFudge;
-		var dt = time - nowTime;
-		if(dt > 0) this.delayedRelease.push({ id : id, time : time}); else this.toneReleased.emit(id);
-		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.setTargetAtTime(0,time,Math.log(data.release + 1.0) / 4.605170185988092);
-		this.delayedEnd.push({ id : id, time : time + data.release});
-	}
-	,releaseAll: function(atTime) {
-		if(atTime == null) atTime = -1;
-		var $it0 = this.activeTones.keys();
-		while( $it0.hasNext() ) {
-			var id = $it0.next();
-			this.doRelease(id,atTime);
-		}
-	}
-	,doStop: function(id) {
-		var data = this.activeTones.h[id];
-		if(data == null) return;
-		data.osc.stop(this.context.currentTime);
-		data.osc.disconnect();
-		data.env.gain.cancelScheduledValues(this.context.currentTime);
-		data.env.disconnect();
-		this.triggerToneEnd(id);
-		this.activeTones.remove(id);
-	}
-	,set_attack: function(value) {
-		if(value < 0.0001) value = 0.0001;
-		return this._attack = value;
-	}
-	,set_release: function(value) {
-		if(value < 0.0001) value = 0.0001;
-		return this._release = value;
-	}
-	,set_volume: function(value) {
-		if(value < 0) value = 0; else if(value > 1) value = 1;
-		return this._volume = value;
-	}
-	,triggerToneBegin: function(id) {
-		this.polyphony++;
-		this.toneBegin.emit(id,this.polyphony);
-	}
-	,triggerToneEnd: function(id) {
-		this.polyphony--;
-		this.toneEnd.emit(id,this.polyphony);
-	}
-	,tick: function(_) {
-		window.requestAnimationFrame($bind(this,this.tick));
-		var t = this.context.currentTime;
-		var halfDt = (t - this.lastTime) / 2;
-		this.lastTime = t;
-		var j = 0;
-		var n = this.delayedBegin.length;
-		while(j < n) {
-			var item = this.delayedBegin[j];
-			if(t > item.time + halfDt) {
-				this.triggerToneBegin(item.id);
-				this.delayedBegin.splice(j,1);
-				n--;
-			} else j++;
-		}
-		j = 0;
-		n = this.delayedRelease.length;
-		while(j < n) {
-			var item1 = this.delayedRelease[j];
-			if(t > item1.time + halfDt) {
-				this.toneReleased.emit(item1.id);
-				this.delayedRelease.splice(j,1);
-				n--;
-			} else j++;
-		}
-		j = 0;
-		n = this.delayedEnd.length;
-		while(j < n) {
-			var item2 = this.delayedEnd[j];
-			if(t > item2.time + halfDt) {
-				this.doStop(item2.id);
-				this.delayedEnd.splice(j,1);
-				n--;
-			} else j++;
-		}
-	}
 	,__class__: tones_Tones
-};
+});
+var tones_data_OscillatorTypeShim = function() { };
+tones_data_OscillatorTypeShim.__name__ = true;
 var tones_examples_Basic = function() {
 	this.tones = new tones_Tones();
 	this.tones.playFrequency(440);
@@ -1182,8 +1106,8 @@ tones_examples_CustomWaves.prototype = {
 };
 var tones_examples_FreqSlide = function() {
 	this.tones = new tones_Tones();
-	this.tones.toneBegin.connect($bind(this,this.onToneStart));
-	this.tones.toneReleased.connect($bind(this,this.onToneReleased));
+	this.tones.itemBegin.connect($bind(this,this.onToneStart));
+	this.tones.itemRelease.connect($bind(this,this.onToneReleased));
 	this.tones.type = window.OscillatorTypeShim.SQUARE;
 	this.tones.set_volume(.04);
 	this.tones.set_attack(.200);
@@ -1192,14 +1116,14 @@ var tones_examples_FreqSlide = function() {
 };
 tones_examples_FreqSlide.__name__ = true;
 tones_examples_FreqSlide.prototype = {
-	onToneStart: function(id,poly) {
-		var data = this.tones.activeTones.h[id];
-		data.osc.frequency.setTargetAtTime(20 + 420 * Math.random(),this.tones.context.currentTime,Math.log(2.) / 4.605170185988092);
+	onToneStart: function(id,time) {
+		var data = this.tones.activeItems.h[id];
+		(js_Boot.__cast(data.src , OscillatorNode)).frequency.setTargetAtTime(20 + 420 * Math.random(),this.tones.context.currentTime,Math.log(2.) / 4.605170185988092);
 		this.tones.releaseAfter(id,1);
 	}
-	,onToneReleased: function(id) {
-		var data = this.tones.activeTones.h[id];
-		this.tones.playFrequency(data.osc.frequency.value,0,false);
+	,onToneReleased: function(id,time) {
+		var data = this.tones.activeItems.h[id];
+		this.tones.playFrequency((js_Boot.__cast(data.src , OscillatorNode)).frequency.value,0,false);
 	}
 	,__class__: tones_examples_FreqSlide
 };
@@ -1211,7 +1135,7 @@ var tones_examples_KeyboardControlled = function() {
 	p.className = "noselect";
 	p.textContent = "Play using your keyboard. Check the dev console for some stats.";
 	window.document.body.appendChild(p);
-	this.context = tones_Tones.createContext();
+	this.context = tones_AudioBase.createContext();
 	this.outGain = this.context.createGain();
 	this.outGain.gain.value = .5;
 	this.tonesA = new tones_Tones(this.context,this.outGain);
@@ -1473,12 +1397,12 @@ var tones_examples_LorenzTones = function() {
 	this.freqHigh = 220;
 	this.lorenz = new tones_examples_Lorenz();
 	this.minMax = new Float32Array([Infinity,-Infinity,Infinity,-Infinity,Infinity,-Infinity]);
-	var c = tones_Tones.createContext();
+	var c = tones_AudioBase.createContext();
 	this.masterGain = c.createGain();
 	this.masterGain.gain.value = .75;
 	this.masterGain.connect(c.destination);
 	this.tones = new tones_Tones(c,this.masterGain);
-	this.tones.toneBegin.connect($bind(this,this.onToneStart));
+	this.tones.itemBegin.connect($bind(this,this.onToneStart));
 	this.tones.type = window.OscillatorTypeShim.TRIANGLE;
 	this.tones.set_volume(.2);
 	this.tones.set_attack(.250);
@@ -1489,11 +1413,11 @@ var tones_examples_LorenzTones = function() {
 };
 tones_examples_LorenzTones.__name__ = true;
 tones_examples_LorenzTones.prototype = {
-	onToneStart: function(id,poly) {
-		if(poly == 3) {
-			this.osc1 = this.tones.activeTones.h[0].osc;
-			this.osc2 = this.tones.activeTones.h[1].osc;
-			this.osc3 = this.tones.activeTones.h[2].osc;
+	onToneStart: function(id,time) {
+		if(this.tones.polyphony == 3) {
+			this.osc1 = this.tones.activeItems.h[0].src;
+			this.osc2 = this.tones.activeItems.h[1].src;
+			this.osc3 = this.tones.activeItems.h[2].src;
 			window.requestAnimationFrame($bind(this,this.enterFrame));
 		}
 	}
@@ -1565,25 +1489,24 @@ tones_examples_Lorenz.prototype = {
 var tones_examples_RandomSequence = function() {
 	this.tones = new tones_Tones();
 	this.tones.type = window.OscillatorTypeShim.SQUARE;
-	this.tones.toneBegin.connect($bind(this,this.onToneBegin));
-	this.tones.toneEnd.connect($bind(this,this.onToneEnd));
+	this.tones.itemBegin.connect($bind(this,this.onToneBegin));
+	this.tones.itemEnd.connect($bind(this,this.onToneEnd));
 	this.playRandom();
 };
 tones_examples_RandomSequence.__name__ = true;
 tones_examples_RandomSequence.prototype = {
 	playRandom: function() {
-		this.tones.set_volume(.001 + Math.random() * .04);
-		this.tones.set_attack(.010 + Math.random() * Math.random() * .500);
-		this.tones.set_release(.020 + Math.random() * Math.random() * .500);
+		this.tones.set_volume(.025 + Math.random() * .04);
+		this.tones.set_attack(.01 + Math.random() * Math.random() * .100);
+		this.tones.set_release(.10 + Math.random() * Math.random() * .200);
 		var freq = 50 + Math.random() * 600;
-		var delay = Math.random();
-		this.tones.playFrequency(freq,delay);
+		this.tones.playFrequency(freq,Math.random());
 	}
-	,onToneBegin: function(id,polyphony) {
-		if(polyphony < 3) this.playRandom();
+	,onToneBegin: function(id,time) {
+		if(this.tones.polyphony < 4) this.playRandom();
 	}
-	,onToneEnd: function(id,polyphony) {
-		if(polyphony < 3) this.playRandom();
+	,onToneEnd: function(id) {
+		if(this.tones.polyphony < 2) this.playRandom();
 	}
 	,__class__: tones_examples_RandomSequence
 };
@@ -1608,8 +1531,17 @@ tones_examples_ReleaseLater.prototype = {
 };
 var tones_examples_SamplesBasic = function() {
 	var _g = this;
-	this.samples = new tones_Samples();
-	this.samples.sampleBegin.connect($bind(this,this.onSampleBegin));
+	this.ctx = tones_AudioBase.createContext();
+	this.outGain = this.ctx.createGain();
+	this.outGain.gain.value = .7;
+	this.outGain.connect(this.ctx.destination);
+	this.tones = new tones_Tones(this.ctx,this.outGain);
+	this.tones.type = window.OscillatorTypeShim.SQUARE;
+	this.tones.set_attack(0.01);
+	this.tones.set_release(.5);
+	this.tones.set_volume(.2);
+	this.samples = new tones_Samples(this.ctx,this.outGain);
+	this.samples.itemBegin.connect($bind(this,this.onSampleBegin));
 	var request = new XMLHttpRequest();
 	request.open("GET","data/samples/kick.wav",true);
 	request.responseType = "arraybuffer";
@@ -1628,24 +1560,36 @@ tones_examples_SamplesBasic.prototype = {
 		this.restartId = this.samples.lastId;
 		this.samples.playSample(buffer,.5);
 	}
-	,onSampleBegin: function(id,poly) {
-		if(id == this.restartId) this.playSequence();
+	,onSampleBegin: function(id,time) {
+		console.log("sample " + id + " starts at " + time + " (in " + (time - this.ctx.currentTime) + ")");
+		if(id == this.restartId) {
+			var delay = time - this.ctx.currentTime;
+			if(delay < 0) delay = 0;
+			this.playSequence(delay);
+		}
 	}
-	,playSequence: function() {
-		this.samples.playSample(this.buffer,0.5);
-		this.samples.playSample(this.buffer,1.);
-		this.samples.playSample(this.buffer,1.5);
-		this.samples.playSample(this.buffer,2.);
-		this.samples.playSample(this.buffer,2.5);
-		this.samples.playSample(this.buffer,3.);
-		this.samples.playSample(this.buffer,3.125);
-		this.samples.playSample(this.buffer,3.25);
-		this.samples.playSample(this.buffer,3.375);
-		this.samples.playSample(this.buffer,3.5);
-		this.samples.playSample(this.buffer,3.625);
-		this.samples.playSample(this.buffer,3.75);
-		this.samples.playSample(this.buffer,3.875);
-		this.restartId = this.samples.playSample(this.buffer,4.);
+	,playSequence: function(delay) {
+		if(delay == null) delay = 0;
+		this.tones.set_volume(.05);
+		this.tones.playFrequency(55,delay + 0.75);
+		this.tones.playFrequency(110,delay + 2.);
+		this.tones.playFrequency(55,delay + 2.25);
+		this.tones.playFrequency(110,delay + 3.);
+		this.tones.playFrequency(55,delay + 3.75);
+		this.samples.playSample(this.buffer,delay + 0.5);
+		this.samples.playSample(this.buffer,delay + 1.);
+		this.samples.playSample(this.buffer,delay + 1.5);
+		this.samples.playSample(this.buffer,delay + 2.);
+		this.samples.playSample(this.buffer,delay + 2.5);
+		this.samples.playSample(this.buffer,delay + 3.);
+		this.samples.playSample(this.buffer,delay + 3.125);
+		this.samples.playSample(this.buffer,delay + 3.25);
+		this.samples.playSample(this.buffer,delay + 3.375);
+		this.samples.playSample(this.buffer,delay + 3.5);
+		this.samples.playSample(this.buffer,delay + 3.625);
+		this.samples.playSample(this.buffer,delay + 3.75);
+		this.samples.playSample(this.buffer,delay + 3.875);
+		this.restartId = this.samples.playSample(this.buffer,delay + 4.);
 	}
 	,__class__: tones_examples_SamplesBasic
 };
@@ -1658,58 +1602,49 @@ var tones_examples_Sequence = function() {
 	this.tones.type = window.OscillatorTypeShim.SAWTOOTH;
 	this.freqUtil = new tones_utils_NoteFrequencyUtil();
 	this.lastNoteId = -1;
-	this.tones.toneEnd.connect(function(id,poly) {
-		var tmp;
-		var x = Math.random() * 12;
-		tmp = x | 0;
-		var r = 2 + tmp;
-		if(poly == r) {
-			_g.tones.set_volume(.05);
-			var tmp1;
-			var x1 = Math.random() * 3;
-			tmp1 = x1 | 0;
-			var octave = 1 + tmp1;
-			var tmp2;
-			var x2 = Math.random() * 12;
-			tmp2 = x2 | 0;
-			var note = tones_utils_NoteFrequencyUtil.pitchNames[tmp2];
-			_g.tones.playFrequency(_g.freqUtil.noteNameToFrequency("" + note + octave),.1);
-		}
-	});
-	this.tones.toneBegin.connect(function(id1,poly1) {
-		if(id1 == _g.lastNoteId) {
+	this.tones.itemBegin.connect(function(id,time) {
+		if(id == _g.lastNoteId) {
 			console.log("repeat");
-			_g.playSequence();
+			_g.playSequence(time);
+		} else {
+			var tmp;
+			var x = Math.random() * 10;
+			tmp = x | 0;
+			var r = 2 + tmp;
+			if(_g.tones.polyphony == r) {
+				_g.tones.set_volume(.05);
+				var tmp1;
+				var x1 = Math.random() * 3;
+				tmp1 = x1 | 0;
+				var octave = 1 + tmp1;
+				var tmp2;
+				var x2 = Math.random() * 12;
+				tmp2 = x2 | 0;
+				var note = tones_utils_NoteFrequencyUtil.pitchNames[tmp2];
+				_g.tones.playFrequency(_g.freqUtil.noteNameToFrequency("" + note + octave),time - _g.tones.context.currentTime + 0.125);
+			}
 		}
 	});
-	this.playSequence();
+	this.playSequence(this.tones.context.currentTime);
 };
 tones_examples_Sequence.__name__ = true;
 tones_examples_Sequence.prototype = {
-	playSequence: function() {
+	playSequence: function(time) {
+		var start = time - this.tones.context.currentTime;
 		this.tones.set_volume(.05);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C3"),0);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C4"),.2);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C5"),.4);
-		var _g = this.tones;
-		_g.set_volume(_g._volume * .9);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G3"),.8);
-		var _g1 = this.tones;
-		_g1.set_volume(_g1._volume * .8);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G4"),1);
-		var _g2 = this.tones;
-		_g2.set_volume(_g2._volume * .7);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G5"),1.2);
-		this.tones.set_volume(.08);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G2"),1);
-		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G1"),1.2);
-		this.tones.set_volume(.05);
-		this.lastNoteId = this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C1"),1.4);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C3"),start);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C4"),start + 0.25);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C5"),start + 0.5);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G3"),start + 1.);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G4"),start + 1.25);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G5"),start + 1.5);
+		this.tones.playFrequency(this.freqUtil.noteNameToFrequency("G2"),start + 2.);
+		this.lastNoteId = this.tones.playFrequency(this.freqUtil.noteNameToFrequency("C2"),start + 2.);
 	}
 	,__class__: tones_examples_Sequence
 };
 var tones_examples_SharedContext = function() {
-	this.context = tones_Tones.createContext();
+	this.context = tones_AudioBase.createContext();
 	var pan1 = this.context.createPanner();
 	var pan2 = this.context.createPanner();
 	pan1.panningModel = "equalpower";
@@ -2079,6 +2014,15 @@ tones_utils_NoteFrequencyUtil.prototype = {
 	}
 	,__class__: tones_utils_NoteFrequencyUtil
 };
+var tones_utils_TimeUtil = function() { };
+tones_utils_TimeUtil.__name__ = true;
+tones_utils_TimeUtil.get_frameTick = function() {
+	return tones_utils_TimeUtil._frameTick;
+};
+tones_utils_TimeUtil.onFrame = function(_) {
+	window.requestAnimationFrame(tones_utils_TimeUtil.onFrame);
+	tones_utils_TimeUtil._frameTick.emit(_);
+};
 var tones_utils_Wavetables = function() {
 	this.loadComplete = new hxsignal_impl_Signal0();
 	this.loadAll();
@@ -2150,6 +2094,8 @@ if(node != null) {
 		window.OscillatorTypeShim = {SINE:"sine", SQUARE:"square", TRIANGLE:"triangle", SAWTOOTH:"sawtooth", CUSTOM:"custom"}
 	}
 }
+tones_utils_TimeUtil._frameTick = new hxsignal_impl_Signal1();
+window.requestAnimationFrame(tones_utils_TimeUtil.onFrame);
 haxe_ds_ObjectMap.count = 0;
 js_Boot.__toStr = {}.toString;
 tones_utils_Wavetables.FileNames = ["Bass.json","Bass_Amp360.json","Bass_Fuzz.json","Bass_Fuzz_2.json","Bass_Sub_Dub.json","Bass_Sub_Dub_2.json","Brass.json","Brit_Blues.json","Brit_Blues_Driven.json","Buzzy_1.json","Buzzy_2.json","Celeste.json","Chorus_Strings.json","Dissonant_1.json","Dissonant_2.json","Dissonant_Piano.json","Dropped_Saw.json","Dropped_Square.json","Dyna_EP_Bright.json","Dyna_EP_Med.json","Ethnic_33.json","Full_1.json","Full_2.json","Guitar_Fuzz.json","Harsh.json","Mkl_Hard.json","Noise.json","Organ_2.json","Organ_3.json","Phoneme_ah.json","Phoneme_bah.json","Phoneme_ee.json","Phoneme_o.json","Phoneme_ooh.json","Phoneme_pop_ahhhs.json","Piano.json","Putney_Wavering.json","TB303_Square.json","Throaty.json","Trombone.json","TwelveStringGuitar.json","Twelve_OpTines.json","Warm_Saw.json","Warm_Square.json","Warm_Triangle.json","Wurlitzer.json","Wurlitzer_2.json"];

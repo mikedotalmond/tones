@@ -15,10 +15,10 @@ import tones.utils.TimeUtil;
  */
 
 class Samples extends AudioBase {
-  
+
 	public var buffer:AudioBuffer = null;
 	public var playbackRate:Float;
-	
+
 	/**
 	 * @param	audioContext 	- optional. Pass an exsiting audioContext here to share it.
 	 * @param	destinationNode - optional. Pass a custom destination AudioNode to connect to.
@@ -27,8 +27,8 @@ class Samples extends AudioBase {
 		super(audioContext, destinationNode);
 		playbackRate = 1.0;
 	}
-	
-	
+
+
 	/**
 	 * Play a sample
 	 * sample.playSample(myBuffer); // play the myBuffer sample
@@ -39,38 +39,38 @@ class Samples extends AudioBase {
 	 * @param	delayBy		- A time, in seconds, to delay triggering this sample by.
 	 * @param	autoRelease - Release as soon as attack phase ends - default behaviour (true)
 	 * 						  when false the sample will play until doRelease(sampleId) is called
-	 * 						- Don't use these behaviours at the same time in one Samples instance 
+	 * 						- Don't use these behaviours at the same time in one Samples instance
 	 * @return 	id			- The ID assigned to the tone being played. Use for doRelease() when using autoRelease=false
 	 */
     public function playSample(buffer:AudioBuffer, delayBy:Float = .0, autoRelease:Bool = true):Int {
-		
+
 		if (delayBy < 0) delayBy = 0;
-		
+
 		var id = nextID();
-		
+
 		var envelope = context.createGain();
 		var triggerTime = now + delayBy;
 		var releaseTime = triggerTime + attack;
-		
+
 		envelope.gain.value = 0;
 		envelope.connect(destination);
 		// attack
 		envelope.gain.setTargetAtTime(volume, triggerTime, TimeUtil.getTimeConstant(attack));
-		
+
 		var src = context.createBufferSource();
 		src.buffer = buffer;
 		src.playbackRate.value = playbackRate;
-		
+
 		src.connect(envelope);
 		src.start(triggerTime);
-		
-		activeItems.set(id, { id:id, src:src, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
-		
+
+		activeItems.set(id, { id:id, src:src, volume:volume, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
+
 		if (delayBy == 0) triggerItemBegin(id, triggerTime);
 		else delayedBegin.push({id:id, time:triggerTime});
-		
+
 		if (autoRelease) doRelease(id, releaseTime);
-		
+
 		return id;
 	}
 }

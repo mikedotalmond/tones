@@ -17,4 +17,5 @@ typedef ItemData = {
 	var triggerTime:Float;
 	var attack:Float;
 	var release:Float;
+	var volume:Float;
 }

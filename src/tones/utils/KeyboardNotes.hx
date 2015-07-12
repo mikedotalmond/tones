@@ -11,20 +11,20 @@ import js.html.Float32Array;
 import tones.utils.NoteFrequencyUtil;
 
 class KeyboardNotes {
-	
+
 	public var startOctave(default, null):Int;
 	public var noteFreq(default, null):NoteFrequencyUtil;
 	public var keycodeToNoteFreq(default, null):Map<Int,Float>;
 	public var keycodeToNoteIndex(default, null):Map<Int,Int>;
-	
+
 	public function new(startOctave:Int = 0) {
-		
+
 		this.startOctave	= startOctave;
-		
-		noteFreq 			= new NoteFrequencyUtil();		
+
+		noteFreq 			= new NoteFrequencyUtil();
 		keycodeToNoteFreq 	= new Map<Int,Float>();
 		keycodeToNoteIndex 	= new Map<Int,Int>();
-		
+
 		keycodeToNoteIndex.set(KeyCodes.Z, noteFreq.noteNameToIndex('C${startOctave}'));
 		keycodeToNoteIndex.set(KeyCodes.S, noteFreq.noteNameToIndex('C#${startOctave}'));
 		keycodeToNoteIndex.set(KeyCodes.X, noteFreq.noteNameToIndex('D${startOctave}'));
@@ -57,7 +57,7 @@ class KeyboardNotes {
 		keycodeToNoteIndex.set(KeyCodes.LEFT_BRACKET, noteFreq.noteNameToIndex('F${startOctave+2}'));
 		keycodeToNoteIndex.set(KeyCodes.EQUALS, noteFreq.noteNameToIndex('F#${startOctave+2}'));
 		keycodeToNoteIndex.set(KeyCodes.RIGHT_BRACKET, noteFreq.noteNameToIndex('G${startOctave+2}'));
-		
+
 		keycodeToNoteFreq.set(KeyCodes.Z, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.Z)));
 		keycodeToNoteFreq.set(KeyCodes.S, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.S)));
 		keycodeToNoteFreq.set(KeyCodes.X, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.X)));
@@ -91,10 +91,10 @@ class KeyboardNotes {
 		keycodeToNoteFreq.set(KeyCodes.EQUALS, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.EQUALS)));
 		keycodeToNoteFreq.set(KeyCodes.RIGHT_BRACKET, noteFreq.noteIndexToFrequency(keycodeToNoteIndex.get(KeyCodes.RIGHT_BRACKET)));
 	}
-	
+
 	inline public function noteIndexToFrequency(index:Int):Float return noteFreq.noteIndexToFrequency(index);
 	inline public function noteIndexToFrequencyWithDetune(index:Int, cents:Int):Float return noteFreq.noteIndexToFrequencyWithDetune(index, cents);
-	
+
 	public function dispose() {
 		noteFreq 			= null;
 		keycodeToNoteFreq 	= null;

@@ -54,11 +54,14 @@ class Tones extends AudioBase {
 		var triggerTime = now + delayBy;
 		var releaseTime = triggerTime + attack;
 
-		envelope.gain.value = 0;
-		envelope.connect(destination);
+		if (attack > 0) {
+			envelope.gain.value = 0;
+			envelope.gain.setTargetAtTime(volume, triggerTime, TimeUtil.getTimeConstant(attack));
+		} else {
+			envelope.gain.value = volume;
+		}
 
-		// attack
-		envelope.gain.setTargetAtTime(volume, triggerTime, TimeUtil.getTimeConstant(attack));
+		envelope.connect(destination);
 
 		var osc = context.createOscillator();
 		if (type == OscillatorType.CUSTOM) osc.setPeriodicWave(customWave);
@@ -72,8 +75,7 @@ class Tones extends AudioBase {
 
 		activeItems.set(id, { id:id, src:osc, env:envelope, volume:volume, attack:attack, release:release, triggerTime:triggerTime } );
 
-		if (delayBy == 0) triggerItemBegin(id, triggerTime);
-		else delayedBegin.push( { id:id, time:triggerTime } );		
+		delayedBegin.push( { id:id, time:triggerTime } );
 		if (autoRelease) doRelease(id, releaseTime);
 
 		return id;

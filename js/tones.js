@@ -492,6 +492,7 @@ var hxsignal_impl_Connection = function(signal,slot,times) {
 	this.times = times;
 	this.blocked = false;
 	this.connected = true;
+	this.calledTimes = 0;
 };
 hxsignal_impl_Connection.__name__ = true;
 hxsignal_impl_Connection.prototype = {
@@ -810,7 +811,6 @@ js_Browser.createXMLHttpRequest = function() {
 var tones_AudioBase = function(audioContext,destinationNode) {
 	this.lastTime = .0;
 	this.ID = 0;
-	var _g = this;
 	if(audioContext == null) this.context = tones_AudioBase.createContext(); else this.context = audioContext;
 	if(destinationNode == null) this.destination = this.context.destination; else this.destination = destinationNode;
 	this.delayedBegin = [];
@@ -828,18 +828,6 @@ var tones_AudioBase = function(audioContext,destinationNode) {
 	this.set_attack(0.0);
 	this.set_release(1.0);
 	this.set_volume(.2);
-	this.itemBegin.connect(function(id,time) {
-		console.log("itemBegin | id:" + id + ", time:" + time);
-	});
-	this.itemRelease.connect(function(id1,time1) {
-		console.log("itemRelease | id:" + id1 + ", time:" + time1);
-	});
-	this.itemEnd.connect(function(id2) {
-		console.log("itemEnd | id:" + id2 + ", time:" + _g.context.currentTime);
-	});
-	this.timedEvent.connect(function(id3,time2) {
-		console.log("timedEvent | id:" + id3 + ", time:" + time2);
-	});
 	tones_utils_TimeUtil.get_frameTick().connect($bind(this,this.tick));
 };
 tones_AudioBase.__name__ = true;
@@ -858,10 +846,9 @@ tones_AudioBase.prototype = {
 		var nowTime = this.context.currentTime;
 		if(atTime < nowTime) time = nowTime; else time = atTime;
 		time += this.releaseFudge;
-		var dt = time - nowTime;
-		if(dt > 0) this.delayedRelease.push({ id : id, time : time}); else this.itemRelease.emit(id,nowTime);
 		data.env.gain.cancelScheduledValues(time);
 		data.env.gain.setTargetAtTime(0,time,Math.log(this._release + 1.0) / 4.605170185988092);
+		this.delayedRelease.push({ id : id, time : time});
 		this.delayedEnd.push({ id : id, time : time + this._release});
 	}
 	,releaseAll: function(atTime) {
@@ -883,7 +870,7 @@ tones_AudioBase.prototype = {
 		this.activeItems.remove(id);
 	}
 	,set_attack: function(value) {
-		if(value < 0.001) value = 0.001;
+		if(value < 0.001) value = 0;
 		return this._attack = value;
 	}
 	,set_release: function(value) {
@@ -906,34 +893,34 @@ tones_AudioBase.prototype = {
 		var t = this.context.currentTime;
 		var dt = t - this.lastTime;
 		this.lastTime = t;
-		var nextTime = t + dt * 2;
+		t += dt + dt;
 		var j = 0;
-		var n = this.delayedBegin.length;
+		var n = this.timedEvents.length;
 		while(j < n) {
-			var item = this.delayedBegin[j];
-			if(nextTime > item.time) {
-				this.triggerItemBegin(item.id,item.time);
-				this.delayedBegin.splice(j,1);
-				n--;
-			} else j++;
-		}
-		j = 0;
-		n = this.delayedRelease.length;
-		while(j < n) {
-			var item1 = this.delayedRelease[j];
-			if(nextTime > item1.time) {
-				this.itemRelease.emit(item1.id,item1.time);
-				this.delayedRelease.splice(j,1);
+			var item = this.timedEvents[j];
+			if(t > item.time) {
+				this.timedEvent.emit(item.id,item.time);
+				this.timedEvents.splice(j,1);
 				n--;
 			} else j++;
 		}
 		var j1 = 0;
-		var n1 = this.timedEvents.length;
+		var n1 = this.delayedBegin.length;
 		while(j1 < n1) {
-			var item2 = this.timedEvents[j1];
-			if(nextTime > item2.time) {
-				this.timedEvent.emit(item2.id,item2.time);
-				this.timedEvents.splice(j1,1);
+			var item1 = this.delayedBegin[j1];
+			if(t > item1.time) {
+				this.triggerItemBegin(item1.id,item1.time);
+				this.delayedBegin.splice(j1,1);
+				n1--;
+			} else j1++;
+		}
+		j1 = 0;
+		n1 = this.delayedRelease.length;
+		while(j1 < n1) {
+			var item2 = this.delayedRelease[j1];
+			if(t > item2.time) {
+				this.itemRelease.emit(item2.id,item2.time);
+				this.delayedRelease.splice(j1,1);
 				n1--;
 			} else j1++;
 		}
@@ -941,7 +928,7 @@ tones_AudioBase.prototype = {
 		n1 = this.delayedEnd.length;
 		while(j1 < n1) {
 			var item3 = this.delayedEnd[j1];
-			if(t >= item3.time) {
+			if(this.lastTime >= item3.time) {
 				this.doStop(item3.id);
 				this.delayedEnd.splice(j1,1);
 				n1--;
@@ -951,15 +938,24 @@ tones_AudioBase.prototype = {
 	,__class__: tones_AudioBase
 };
 var tones_Samples = function(audioContext,destinationNode) {
+	this._buffer = null;
 	tones_AudioBase.call(this,audioContext,destinationNode);
 	this.playbackRate = 1.0;
+	this.offset = 0;
+	this.duration = 0;
 };
 tones_Samples.__name__ = true;
 tones_Samples.__super__ = tones_AudioBase;
 tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
-	playSample: function(buffer,delayBy,autoRelease) {
+	set_buffer: function(value) {
+		this.offset = 0;
+		this.duration = value.duration;
+		return this._buffer = value;
+	}
+	,playSample: function(buffer,delayBy,autoRelease) {
 		if(autoRelease == null) autoRelease = true;
 		if(delayBy == null) delayBy = .0;
+		if(buffer != null) this.set_buffer(buffer);
 		if(delayBy < 0) delayBy = 0;
 		var tmp;
 		this.lastId = this.ID;
@@ -969,15 +965,18 @@ tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
 		var envelope = this.context.createGain();
 		var triggerTime = this.context.currentTime + delayBy;
 		var releaseTime = triggerTime + this._attack;
-		envelope.gain.value = 0;
+		if(this._attack > 0) {
+			envelope.gain.value = 0;
+			envelope.gain.setTargetAtTime(this._volume,triggerTime,Math.log(this._attack + 1.0) / 4.605170185988092);
+		} else envelope.gain.value = this._volume;
 		envelope.connect(this.destination);
-		envelope.gain.setTargetAtTime(this._volume,triggerTime,Math.log(this._attack + 1.0) / 4.605170185988092);
 		var src = this.context.createBufferSource();
-		src.buffer = buffer;
+		src.buffer = this._buffer;
 		src.playbackRate.value = this.playbackRate;
+		if(this.duration <= 0) this.duration = src.buffer.duration;
 		src.connect(envelope);
-		src.start(triggerTime);
-		this.activeItems.h[id] = { id : id, src : src, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
+		src.start(triggerTime,this.offset,this.duration);
+		this.activeItems.h[id] = { id : id, src : src, volume : this._volume, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
 		if(delayBy == 0) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
 		if(autoRelease) this.doRelease(id,releaseTime);
 		return id;
@@ -1003,16 +1002,18 @@ tones_Tones.prototype = $extend(tones_AudioBase.prototype,{
 		var envelope = this.context.createGain();
 		var triggerTime = this.context.currentTime + delayBy;
 		var releaseTime = triggerTime + this._attack;
-		envelope.gain.value = 0;
+		if(this._attack > 0) {
+			envelope.gain.value = 0;
+			envelope.gain.setTargetAtTime(this._volume,triggerTime,Math.log(this._attack + 1.0) / 4.605170185988092);
+		} else envelope.gain.value = this._volume;
 		envelope.connect(this.destination);
-		envelope.gain.setTargetAtTime(this._volume,triggerTime,Math.log(this._attack + 1.0) / 4.605170185988092);
 		var osc = this.context.createOscillator();
 		if(this.type == window.OscillatorTypeShim.CUSTOM) osc.setPeriodicWave(this.customWave); else osc.type = this.type;
 		osc.frequency.value = freq;
 		osc.connect(envelope);
 		osc.start(triggerTime);
-		this.activeItems.h[id] = { id : id, src : osc, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
-		if(delayBy == 0) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
+		this.activeItems.h[id] = { id : id, src : osc, env : envelope, volume : this._volume, attack : this._attack, release : this._release, triggerTime : triggerTime};
+		this.delayedBegin.push({ id : id, time : triggerTime});
 		if(autoRelease) this.doRelease(id,releaseTime);
 		return id;
 	}
@@ -1137,7 +1138,7 @@ var tones_examples_KeyboardControlled = function() {
 	window.document.body.appendChild(p);
 	this.context = tones_AudioBase.createContext();
 	this.outGain = this.context.createGain();
-	this.outGain.gain.value = .5;
+	this.outGain.gain.value = .2;
 	this.tonesA = new tones_Tones(this.context,this.outGain);
 	this.tonesA.type = window.OscillatorTypeShim.SQUARE;
 	this.tonesA.set_volume(.62);
@@ -1173,7 +1174,7 @@ tones_examples_KeyboardControlled.prototype = {
 	,setupUI: function() {
 		var _g = this;
 		this.gui = new dat.gui.GUI({ autoPlace : false});
-		this.gui.add({ volume : .5},"volume",0,1).step(0.00390625).onChange(function(_) {
+		this.gui.add({ volume : this.outGain.gain.value},"volume",0,1).step(0.00390625).onChange(function(_) {
 			_g.outGain.gain.setValueAtTime(_,_g.context.currentTime + .1);
 		});
 		this.gui.add(this.keyboardInput,"octaveShift",-1,3).step(1).onChange($bind(this,this.releaseAll));
@@ -2020,8 +2021,8 @@ tones_utils_TimeUtil.get_frameTick = function() {
 	return tones_utils_TimeUtil._frameTick;
 };
 tones_utils_TimeUtil.onFrame = function(_) {
-	window.requestAnimationFrame(tones_utils_TimeUtil.onFrame);
 	tones_utils_TimeUtil._frameTick.emit(_);
+	window.requestAnimationFrame(tones_utils_TimeUtil.onFrame);
 };
 var tones_utils_Wavetables = function() {
 	this.loadComplete = new hxsignal_impl_Signal0();
@@ -2101,5 +2102,3 @@ js_Boot.__toStr = {}.toString;
 tones_utils_Wavetables.FileNames = ["Bass.json","Bass_Amp360.json","Bass_Fuzz.json","Bass_Fuzz_2.json","Bass_Sub_Dub.json","Bass_Sub_Dub_2.json","Brass.json","Brit_Blues.json","Brit_Blues_Driven.json","Buzzy_1.json","Buzzy_2.json","Celeste.json","Chorus_Strings.json","Dissonant_1.json","Dissonant_2.json","Dissonant_Piano.json","Dropped_Saw.json","Dropped_Square.json","Dyna_EP_Bright.json","Dyna_EP_Med.json","Ethnic_33.json","Full_1.json","Full_2.json","Guitar_Fuzz.json","Harsh.json","Mkl_Hard.json","Noise.json","Organ_2.json","Organ_3.json","Phoneme_ah.json","Phoneme_bah.json","Phoneme_ee.json","Phoneme_o.json","Phoneme_ooh.json","Phoneme_pop_ahhhs.json","Piano.json","Putney_Wavering.json","TB303_Square.json","Throaty.json","Trombone.json","TwelveStringGuitar.json","Twelve_OpTines.json","Warm_Saw.json","Warm_Square.json","Warm_Triangle.json","Wurlitzer.json","Wurlitzer_2.json"];
 Main.main();
 })(typeof console != "undefined" ? console : {log:function(){}});
-
-//# sourceMappingURL=tones.js.map

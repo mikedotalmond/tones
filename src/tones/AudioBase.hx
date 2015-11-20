@@ -1,7 +1,7 @@
 package tones;
 
-import hxsignal.Signal;
 import js.Browser;
+import hxsignal.Signal;
 import tones.data.ItemData;
 import tones.utils.TimeUtil;
 
@@ -10,12 +10,16 @@ import js.html.audio.AudioNode;
 import js.html.audio.GainNode;
 
 
+typedef TimedEvent = {
+	var id:Int; 
+	var time:Float;
+}
+
 /**
  * ...
  * @author bit101 - https://github.com/bit101/tones
  * @author Mike Almond - https://github.com/mikedotalmond
  */
-
 class AudioBase {
 
 	static inline function isFirefox() return Browser.navigator.userAgent.indexOf('Firefox') > -1;
@@ -48,10 +52,10 @@ class AudioBase {
 	var releaseFudge:Float;
 	var lastTime:Float = .0;
 
-	var delayedBegin:Array<{id:Int, time:Float}>;
-	var delayedRelease:Array<{id:Int, time:Float}>;
-	var delayedEnd:Array<{id:Int, time:Float}>;
-	var timedEvents:Array<{id:Int, time:Float}>;
+	var delayedBegin:Array<TimedEvent>;
+	var delayedRelease:Array<TimedEvent>;
+	var delayedEnd:Array<TimedEvent>;
+	var timedEvents:Array<TimedEvent>;
 
 	/**
 	 * @param	audioContext 	- optional. Pass an exsiting audioContext here to share it.

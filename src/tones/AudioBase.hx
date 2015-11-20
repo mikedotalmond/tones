@@ -163,7 +163,7 @@ class AudioBase {
 
 
 	/**
-	 * Stop and disconnect nodes after release completes
+	 * Stop and disconnect nodes (called after release completes)
 	 * @param	id
 	 */
 	public function doStop(id:Int) {
@@ -245,7 +245,6 @@ class AudioBase {
 	inline function get_volume():Float return _volume;
 	function set_volume(value:Float):Float {
 		if (value < 0) value = 0;
-		else if (value > 1) value = 1;
 		return _volume = value;
 	}
 

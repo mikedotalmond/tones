@@ -32,6 +32,9 @@ class LorenzTones {
 	
 	public function new() {
 		
+		// NOTE: After a while Firefox (42) has trouble with this example and glitches-out... not sure why. not nice glithces either. pops and crackles.
+		// NOTE: The issue seems to have been resoved in the Firefox dev release (44.0a2)
+		
 		speed = 16;
 		freqLow = 80;
 		freqHigh = 220;
@@ -80,8 +83,7 @@ class LorenzTones {
 		
 		if (dt == 0) return;
 		
-		for(i in 0...speed) lorenz.step(1 / 1280);
-		
+		for (i in 0...speed) lorenz.step(1 / 1280);
 		
 		var lx = lorenz.x; var ly = lorenz.y; var lz = lorenz.z;
 		minMax[0] = Math.min(minMax[0], lx);
@@ -99,17 +101,14 @@ class LorenzTones {
 		if (y < 0 || Math.isNaN(y)) y = 0;
 		if (z < 0 || !Math.isFinite(z)) z = 0;
 		
-		//trace('$x,$y,$z');
-		var now = tones.context.currentTime;
-		osc1.frequency.cancelScheduledValues(now);
-		osc2.frequency.cancelScheduledValues(now);
-		osc3.frequency.cancelScheduledValues(now);
 		
 		var range = (freqHigh - freqLow);
-		var tc = TimeUtil.getTimeConstant(dt / 1000);
-		osc1.frequency.setTargetAtTime(freqLow + x * range, now, tc);
-		osc2.frequency.setTargetAtTime(freqLow + y * range, now, tc);
-		osc3.frequency.setTargetAtTime(freqLow + z * range, now, tc);
+		range = range < 0 ? -range : range;
+		var  endTime = tones.now + dt / 1000;
+		
+		osc1.frequency.exponentialRampToValueAtTime(freqLow + x * range, endTime);
+		osc2.frequency.exponentialRampToValueAtTime(freqLow + y * range, endTime);
+		osc3.frequency.exponentialRampToValueAtTime(freqLow + z * range, endTime);
 	}
 	
 	

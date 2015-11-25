@@ -55,16 +55,18 @@ class NoteFrequencyUtil {
 	}
 	
 	public function noteIndexToFrequencyWithDetune(index:Int, cents:Int = 0):Float {
-		if (index >= 0 && index < 128) {
-			if (cents == 0) return noteFrequencies[index];				
-			else if (cents < 0) return noteFrequencies[index] / Math.pow(2, -cents * centExp);
-			else return noteFrequencies[index] * Math.pow(2, cents * centExp);
-		}
+		if (index >= 0 && index < 128) return detune(noteFrequencies[index], cents);
 		return Math.NaN;
 	}
 	
 	public inline function frequencyToNoteIndex(frequency:Float):Int {
 		return Std.int(frequencyToNote(frequency));
+	}
+	
+	public function detune(freq:Float, detuneCents:Int):Float {
+		if (detuneCents == 0) return freq;
+		else if (detuneCents < 0) return freq / Math.pow(2, -detuneCents * centExp);
+		else return freq * Math.pow(2, detuneCents * centExp);
 	}
 	
 	/**

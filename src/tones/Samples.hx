@@ -59,38 +59,38 @@ class Samples extends AudioBase {
 
 		if (buffer != null) this.buffer = buffer;
 		if (delayBy < 0) delayBy = 0;
-
+		
 		var id = nextID();
-
-		var envelope = context.createGain();
 		var triggerTime = now + delayBy;
 		var releaseTime = triggerTime + attack;
-
-		if (attack > 0) {
-			envelope.gain.value = 0;
-			envelope.gain.setTargetAtTime(volume, triggerTime, TimeUtil.getTimeConstant(attack));
-		} else {
-			envelope.gain.value = volume;
-		}
-
+		var envelope = context.createGain();
+		
+		//
+		//
+		envelope.gain.value = 0;
+		envelope.gain.setValueAtTime(0, triggerTime); // start at zero
+		envelope.gain.linearRampToValueAtTime(volume, releaseTime); // ramp up to volume during attack
+		envelope.gain.setValueAtTime(volume, releaseTime); // set at volume after ramp
 		envelope.connect(destination);
-
+		
+		//
+		//
 		var src = context.createBufferSource();
-
 		src.buffer = this.buffer;
 		src.playbackRate.value = playbackRate;
-
-		if (duration <= 0) duration = src.buffer.duration;
-
+		
 		src.connect(envelope);
+		if (duration <= 0) duration = buffer.duration;
 		src.start(triggerTime, offset, duration);
-
+		
+		//
+		//
 		activeItems.set(id, { id:id, src:src, volume:volume, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 
-		if (delayBy == 0) triggerItemBegin(id, triggerTime);
+		if (delayBy < sampleTime) triggerItemBegin(id, triggerTime);
 		else delayedBegin.push({id:id, time:triggerTime});
-
-		if (autoRelease) doRelease(id, releaseTime);
+		
+		if (autoRelease) doRelease(id, releaseTime + sampleTime);
 
 		return id;
 	}

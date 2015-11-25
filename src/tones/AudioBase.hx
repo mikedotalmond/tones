@@ -49,13 +49,13 @@ class AudioBase {
 	var _attack:Float;
 	var _release:Float;
 	var _volume:Float;
-	var releaseFudge:Float;
 	var lastTime:Float = .0;
 
 	var delayedBegin:Array<TimedEvent>;
 	var delayedRelease:Array<TimedEvent>;
 	var delayedEnd:Array<TimedEvent>;
 	var timedEvents:Array<TimedEvent>;
+	var sampleTime:Float;
 
 	/**
 	 * @param	audioContext 	- optional. Pass an exsiting audioContext here to share it.
@@ -69,6 +69,8 @@ class AudioBase {
 			context = audioContext;
 		}
 
+		sampleTime = 1.0 / context.sampleRate;
+		
 		if (destinationNode == null) destination = context.destination;
 		else destination = destinationNode;
 
@@ -84,13 +86,7 @@ class AudioBase {
 		itemBegin = new Signal<Int->Float->Void>();
 		itemEnd = new Signal<Int->Void>();
 		timedEvent = new Signal<Int->Float->Void>();
-		// Hmm - Firefox (dev) appears to need the setTargetAtTime time to be a bit in the future for it to work in the release phase.
-		// (apparently about 4096 samples worth of data (1 buffer perhaps?))
-		// If I use context.currentTime the setTargetAtTime will not fade-out, it just ends aruptly.
-		// Even with this delay in place it's still occasionaly glitchy...
-		// Works fine in Chrome
-		releaseFudge = isFirefox() ? (4096 / context.sampleRate) : 0;
-
+		
 		// set some reasonable defaults
 		attack 	= 0.0;
 		release = 1.0;
@@ -143,14 +139,13 @@ class AudioBase {
 		var time;
 		var nowTime = now;
 
-		if (atTime < nowTime) time = nowTime;
+		if (atTime <= nowTime) time = nowTime + sampleTime;
 		else time = atTime;
-
-		time += releaseFudge;
-
+		
 		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.setTargetAtTime(0, time, TimeUtil.getTimeConstant(release));
-
+		data.env.gain.linearRampToValueAtTime(0, time + release);
+		data.env.gain.setValueAtTime(0, time + release);
+		
 		delayedRelease.push( { id:id, time:time } );
 		delayedEnd.push( { id:id, time:time + release } );
 	}
@@ -232,17 +227,17 @@ class AudioBase {
 	 * @return
 	 **/
 	inline function get_now() return context.currentTime;
-
+	
 
 	inline function get_attack():Float return _attack;
 	function set_attack(value:Float):Float {
-		if (value < 0.001) value = 0;
+		if (value < sampleTime) value = sampleTime;
 		return _attack = value;
 	}
 
 	inline function get_release():Float return _release;
 	function set_release(value:Float):Float {
-		if (value < 0.001) value = 0.001;
+		if (value < sampleTime) value = sampleTime;
 		return _release = value;
 	}
 

@@ -48,36 +48,40 @@ class Tones extends AudioBase {
 	 */
     public function playFrequency(freq:Float, delayBy:Float = .0, autoRelease:Bool = true):Int {
 
+		if (delayBy < 0) delayBy = 0;
+		
 		var id = nextID();
-
-		var envelope = context.createGain();
 		var triggerTime = now + delayBy;
 		var releaseTime = triggerTime + attack;
-
-		if (attack > 0) {
-			envelope.gain.value = 0;
-			envelope.gain.setTargetAtTime(volume, triggerTime, TimeUtil.getTimeConstant(attack));
-		} else {
-			envelope.gain.value = volume;
-		}
-
+		var envelope = context.createGain();
+		
+		//
+		//
+		envelope.gain.value = 0;
+		envelope.gain.setValueAtTime(0, triggerTime); // start at zero
+		envelope.gain.linearRampToValueAtTime(volume, releaseTime); // ramp up to volume during attack
+		envelope.gain.setValueAtTime(volume, releaseTime); // set at volume after ramp
 		envelope.connect(destination);
-
+		
+		//
+		//
 		var osc = context.createOscillator();
 		if (type == OscillatorType.CUSTOM) osc.setPeriodicWave(customWave);
-		else osc.type = cast type; // firefox throws InvalidStateError if setting osc type and using setPeriodicWave
-
-		// set freq value before connecting
+		else osc.type = cast type;
+		
 		osc.frequency.value = freq;
-
 		osc.connect(envelope);
-		osc.start(triggerTime);
-
+		osc.start(triggerTime + sampleTime);
+		
+		//
+		//
 		activeItems.set(id, { id:id, src:osc, env:envelope, volume:volume, attack:attack, release:release, triggerTime:triggerTime } );
-
-		delayedBegin.push( { id:id, time:triggerTime } );
-		if (autoRelease) doRelease(id, releaseTime);
-
+		
+		if (delayBy < sampleTime) triggerItemBegin(id, triggerTime);
+		else delayedBegin.push({id:id, time:triggerTime});
+		
+		if (autoRelease) doRelease(id, releaseTime + sampleTime);
+		
 		return id;
 	}
 }

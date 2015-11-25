@@ -1449,15 +1449,12 @@ tones_examples_LorenzTones.prototype = {
 		if(x < 0 || isNaN(x)) x = 0;
 		if(y < 0 || isNaN(y)) y = 0;
 		if(z < 0 || !isFinite(z)) z = 0;
-		var now = this.tones.context.currentTime;
-		this.osc1.frequency.cancelScheduledValues(now);
-		this.osc2.frequency.cancelScheduledValues(now);
-		this.osc3.frequency.cancelScheduledValues(now);
 		var range = this.freqHigh - this.freqLow;
-		var tc = Math.log(dt / 1000 + 1.0) / 4.605170185988092;
-		this.osc1.frequency.setTargetAtTime(this.freqLow + x * range,now,tc);
-		this.osc2.frequency.setTargetAtTime(this.freqLow + y * range,now,tc);
-		this.osc3.frequency.setTargetAtTime(this.freqLow + z * range,now,tc);
+		range = range < 0?-range:range;
+		var endTime = this.tones.context.currentTime + dt / 1000;
+		this.osc1.frequency.exponentialRampToValueAtTime(this.freqLow + x * range,endTime);
+		this.osc2.frequency.exponentialRampToValueAtTime(this.freqLow + y * range,endTime);
+		this.osc3.frequency.exponentialRampToValueAtTime(this.freqLow + z * range,endTime);
 	}
 	,setupUI: function() {
 		var _g = this;

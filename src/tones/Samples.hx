@@ -63,15 +63,7 @@ class Samples extends AudioBase {
 		var id = nextID();
 		var triggerTime = now + delayBy;
 		var releaseTime = triggerTime + attack;
-		var envelope = context.createGain();
-		
-		//
-		//
-		envelope.gain.value = 0;
-		envelope.gain.setValueAtTime(0, triggerTime); // start at zero
-		envelope.gain.linearRampToValueAtTime(volume, releaseTime); // ramp up to volume during attack
-		envelope.gain.setValueAtTime(volume, releaseTime); // set at volume after ramp
-		envelope.connect(destination);
+		var envelope = createAttackEnvelope(triggerTime, releaseTime);
 		
 		//
 		//
@@ -83,15 +75,8 @@ class Samples extends AudioBase {
 		if (duration <= 0) duration = buffer.duration;
 		src.start(triggerTime, offset, duration);
 		
-		//
-		//
-		activeItems.set(id, { id:id, src:src, volume:volume, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
-
-		if (delayBy < sampleTime) triggerItemBegin(id, triggerTime);
-		else delayedBegin.push({id:id, time:triggerTime});
+		setActiveItem(id, src, envelope, delayBy, triggerTime, releaseTime, autoRelease);
 		
-		if (autoRelease) doRelease(id, releaseTime + sampleTime);
-
 		return id;
 	}
 }

@@ -111,7 +111,7 @@ class AudioBase {
 	}
 
 
-	inline function nextID() {
+	inline function nextID():Int {
 		lastId = ID; ID++;
 		return lastId;
 	}
@@ -328,5 +328,30 @@ class AudioBase {
 				j++;
 			}
 		}
+	}
+	
+	
+	function createAttackEnvelope(triggerTime:Float, releaseTime:Float):GainNode {
+		
+		var envelope = context.createGain();
+		
+		envelope.gain.value = 0;
+		envelope.gain.setValueAtTime(0, triggerTime); // start at zero
+		envelope.gain.linearRampToValueAtTime(volume, releaseTime); // ramp up to volume during attack
+		envelope.gain.setValueAtTime(volume, releaseTime); // set at volume after ramp
+		envelope.connect(destination);
+		
+		return envelope;
+	}
+	
+	
+	inline function setActiveItem(id:Int, src:ItemSrcNode, envelope:GainNode, delayBy:Float, triggerTime:Float, releaseTime:Float, autoRelease:Bool):Void {
+		
+		activeItems.set(id, { id:id, src:src, volume:volume, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
+		
+		if (delayBy < sampleTime) triggerItemBegin(id, triggerTime);
+		else delayedBegin.push({id:id, time:triggerTime});
+		
+		if (autoRelease) doRelease(id, releaseTime + sampleTime);
 	}
 }

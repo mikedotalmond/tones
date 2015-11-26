@@ -63,7 +63,7 @@ class NoteFrequencyUtil {
 		return Std.int(frequencyToNote(frequency));
 	}
 	
-	public function detune(freq:Float, detuneCents:Int):Float {
+	public function detune(freq:Float, detuneCents:Float):Float {
 		if (detuneCents == 0) return freq;
 		else if (detuneCents < 0) return freq / Math.pow(2, -detuneCents * centExp);
 		else return freq * Math.pow(2, detuneCents * centExp);

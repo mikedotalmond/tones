@@ -1,0 +1,14 @@
+{
+  "name": "tones",
+  "url" : "https://github.com/mikedotalmond/tones",
+  "license": "MIT",
+  "tags": ["html5", "js", "webaudio", "audio"],
+  "description": "",
+  "version": "1.0.0",
+  "classPath": "src/",
+  "releasenote": "Initial release.",
+  "contributors": ["Mike"],
+  "dependencies": {
+    "hxsignal": ""
+  }
+}

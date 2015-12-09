@@ -32,6 +32,7 @@ class AudioBase {
 	public var destination(default, null):AudioNode;
 
 	public var now(get, never):Float;
+	public var sampleTime(default, null):Float;
 
 	public var attack	(get, set):Float; // seconds
 	public var release	(get, set):Float; // seconds
@@ -55,7 +56,6 @@ class AudioBase {
 	var delayedRelease:Array<TimedEvent>;
 	var delayedEnd:Array<TimedEvent>;
 	var timedEvents:Array<TimedEvent>;
-	var sampleTime:Float;
 
 	/**
 	 * @param	audioContext 	- optional. Pass an exsiting audioContext here to share it.

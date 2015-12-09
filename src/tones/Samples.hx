@@ -1,9 +1,13 @@
 package tones;
 
 import hxsignal.Signal;
+import js.Error;
 import js.html.audio.AudioBuffer;
 import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
+import js.html.XMLHttpRequest;
+import js.html.XMLHttpRequestResponseType;
+import js.Promise;
 import tones.data.ItemData;
 import tones.utils.TimeUtil;
 
@@ -78,5 +82,23 @@ class Samples extends AudioBase {
 		setActiveItem(id, src, envelope, delayBy, triggerTime, releaseTime, autoRelease);
 		
 		return id;
+	}
+	
+	
+	public function loadBuffer(url:String, onDecoded:AudioBuffer->Void, onError:Error->Void=null) {
+		
+		var request = new XMLHttpRequest();
+		request.open("GET", url, true);
+		request.responseType = XMLHttpRequestResponseType.ARRAYBUFFER;
+		request.onload = function(_) {
+			try {
+				context.decodeAudioData(_.currentTarget.response, onDecoded);
+			} catch (err:Error) {
+				if (onError != null) onError(err);
+				else trace(err);
+			}
+		}
+		request.onerror = onError;
+		request.send();
 	}
 }

@@ -1,15 +1,13 @@
 package tones;
 
-import hxsignal.Signal;
+import js.Browser;
 import js.Error;
 import js.html.audio.AudioBuffer;
 import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
+import js.html.AudioElement;
 import js.html.XMLHttpRequest;
 import js.html.XMLHttpRequestResponseType;
-import js.Promise;
-import tones.data.ItemData;
-import tones.utils.TimeUtil;
 
 
 /**
@@ -74,7 +72,6 @@ class Samples extends AudioBase {
 		var src = context.createBufferSource();
 		src.buffer = this.buffer;
 		src.playbackRate.value = playbackRate;
-		
 		src.connect(envelope);
 		if (duration <= 0) duration = buffer.duration;
 		src.start(triggerTime, offset, duration);
@@ -85,6 +82,12 @@ class Samples extends AudioBase {
 	}
 	
 	
+	/**
+	 * 
+	 * @param	url
+	 * @param	onDecoded
+	 * @param	onError
+	 */
 	public function loadBuffer(url:String, onDecoded:AudioBuffer->Void, onError:Error->Void=null) {
 		
 		var request = new XMLHttpRequest();
@@ -101,4 +104,41 @@ class Samples extends AudioBase {
 		request.onerror = onError;
 		request.send();
 	}
+	
+	
+	
+	
+	/**
+	 * I don't like the possible responses (probably/maybe/no) from mediaElement.canPlayType
+	 * 
+	 * This function is optimistic, and will assume that 'probably' and 'maybe' actaully mean 'yes'.
+	 * Debug builds will print out the actual string result from canPlayType()
+	 *
+	 * canPlayType('audio/ogg')
+	 * canPlayType('video/ogg')
+	 * canPlayType('video/ogg', 'theora, vorbis')
+	 * canPlayType('video/webm', 'vp8')
+	 * 
+	 * @param	mimeType
+	 * @param	codecType 
+	 * @return	true/false - true if 'probably' or 'maybe', false if 'no' or empty result.
+	 */
+	public static function canPlayType(mimeType:String, codecType:String = ''):Bool {
+		var result = audioTester == null ? '' : audioTester.canPlayType('$mimeType;codecs="$codecType"');
+		#if debug 
+		trace('Samples.canPlayType $mimeType;codecs="$codecType" = $result');
+		#end
+		return (result == 'no' || result.length == 0) ? false : true;
+	}
+	
+	
+	@:noCompletion static function __init__() {
+		audioTester = try {
+			untyped Browser.document.createAudioElement();
+		} catch (err:Error) {
+			null;
+		}
+	}
+	
+	@:noCompletion static var audioTester:AudioElement = null;
 }

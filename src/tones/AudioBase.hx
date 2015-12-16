@@ -349,7 +349,7 @@ class AudioBase {
 		
 		activeItems.set(id, { id:id, src:src, volume:volume, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
 		
-		if (delayBy < sampleTime) triggerItemBegin(id, triggerTime);
+		if (delayBy < sampleTime && !autoRelease) triggerItemBegin(id, triggerTime);
 		else delayedBegin.push({id:id, time:triggerTime});
 		
 		if (autoRelease) doRelease(id, releaseTime + sampleTime);

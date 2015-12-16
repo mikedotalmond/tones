@@ -1,8 +1,5 @@
-# tones / samples
+# Examples
 
-Originally a Haxe port of https://github.com/bit101/tones for quickly making sounds with the webaudio APIs
+Some examples for the `tones` library.
 
-I've tried to keep the simplicity of the original API, with some added extras - see the examples.
-
-
-Examples: https://mikedotalmond.github.io/tones/
+https://mikedotalmond.github.io/tones/

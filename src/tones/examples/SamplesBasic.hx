@@ -43,12 +43,10 @@ class SamplesBasic {
 		samples = new Samples(ctx, outGain);
 		samples.itemBegin.connect(onSampleBegin);
 		
-		var request = new XMLHttpRequest();
-		request.open("GET", 'data/samples/kick.wav', true);
-		request.responseType = XMLHttpRequestResponseType.ARRAYBUFFER;
-		request.onload = function(_) samples.context.decodeAudioData(_.currentTarget.response, sampleDecoded);
-		request.send();
-		
+		Samples.loadArrayBuffer(
+			'data/samples/kick.wav',
+			function(buffer) Samples.decodeArrayBuffer(buffer, ctx, sampleDecoded)
+		);		
 	}	
 	
 	function sampleDecoded(buffer:AudioBuffer) {

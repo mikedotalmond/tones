@@ -2,10 +2,12 @@ package tones;
 
 import js.Browser;
 import js.Error;
+import js.html.ArrayBuffer;
 import js.html.audio.AudioBuffer;
 import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
 import js.html.AudioElement;
+import js.html.Event;
 import js.html.XMLHttpRequest;
 import js.html.XMLHttpRequestResponseType;
 
@@ -82,34 +84,52 @@ class Samples extends AudioBase {
 	}
 	
 	
+	
 	/**
 	 * 
 	 * @param	url
-	 * @param	onDecoded
+	 * @param	onLoad
 	 * @param	onError
 	 */
-	public function loadBuffer(url:String, onDecoded:AudioBuffer->Void, onError:Error->Void=null) {
+	public static function loadArrayBuffer(url:String,  onLoad:ArrayBuffer->Void, onProgress:Float->Void=null, onError:Error->Void = null) {
 		
 		var request = new XMLHttpRequest();
 		request.open("GET", url, true);
 		request.responseType = XMLHttpRequestResponseType.ARRAYBUFFER;
-		request.onload = function(_) {
-			try {
-				context.decodeAudioData(_.currentTarget.response, onDecoded);
-			} catch (err:Error) {
-				if (onError != null) onError(err);
-				else trace(err);
-			}
-		}
+		
 		request.onerror = onError;
+		request.onload = function(_) onLoad(_.currentTarget.response);
+		if (onProgress != null) {
+			request.onprogress = function(_) {
+				var percent = Math.NaN;
+				if (_.lengthComputable) percent = _.loaded / _.total;
+				onProgress(percent);
+			};
+		}
+		
 		request.send();
 	}
 	
 	
+	/**
+	 * 
+	 * @param	buffer
+	 * @param	context
+	 * @param	onDecoded
+	 * @param	onError
+	 */
+	public static function decodeArrayBuffer(buffer:ArrayBuffer, context:AudioContext, onDecoded:AudioBuffer->Void, onError:Error->Void = null) {
+		try {
+			context.decodeAudioData(buffer, onDecoded);
+		} catch (err:Error) {
+			if (onError != null) onError(err);
+			else throw err;
+		}
+	}		
 	
 	
 	/**
-	 * I don't like the possible responses (probably/maybe/no) from mediaElement.canPlayType
+	 * I don't particularly like the responses (probably/maybe/no/[empty]) from mediaElement.canPlayType
 	 * 
 	 * This function is optimistic, and will assume that 'probably' and 'maybe' actaully mean 'yes'.
 	 * Debug builds will print out the actual string result from canPlayType()
@@ -132,9 +152,10 @@ class Samples extends AudioBase {
 	}
 	
 	
+	
 	@:noCompletion static function __init__() {
 		audioTester = try {
-			untyped Browser.document.createAudioElement();
+			Browser.document.createAudioElement();
 		} catch (err:Error) {
 			null;
 		}

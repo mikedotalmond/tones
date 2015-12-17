@@ -35,7 +35,7 @@ class CustomWaves {
 		
 		tones = new Tones();
 		tones.volume = .15;
-		tones.attack = .010;
+		tones.attack = .050;
 		tones.release = .500;
 		tones.type = OscillatorType.CUSTOM;
 		
@@ -72,11 +72,11 @@ class CustomWaves {
 				if (mouseIsDown) {
 					// hmm, it's pretty fast when playing on mousemove with no rate limit - not unlike granular synthesis.
 					// maybe worth making a granular resynth/sample player. they're always fun.
-					var now = Timer.stamp();
+					var now = tones.now;
 					var dt = now - lastTime;
 					
 					if (dt > .05) { // limit playback rate a little...
-						lastTime = now;
+						lastTime = tones.now;
 					
 						tones.volume = (e.clientY / Browser.window.innerHeight) * .2;
 						

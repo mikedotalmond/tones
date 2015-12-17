@@ -22,12 +22,14 @@ class Basic {
 		tones.playFrequency(440); // play a 440Hz tone with the default settings.
 		
 		// change some settings...
-		tones.volume = .05;
-		tones.attack = .500;
+		tones.volume = .15;
+		tones.attack = .5;
+		tones.release = .50;
+		tones.type = OscillatorType.SAWTOOTH;
 		
 		// NoteFrequencyUtil has various util/conversion functions for working with musical notes and frequencies
 		var freqUtil = new NoteFrequencyUtil();
-		tones.playFrequency(freqUtil.noteNameToFrequency('G3'), 1); // play a G3 tone after 1 second.
+		tones.playFrequency(freqUtil.noteNameToFrequency('G1'), 1, true, 1); // play a G3 tone after 1 second, hold for 1 second
 		
 	}	
 }

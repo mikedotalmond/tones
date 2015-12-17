@@ -36,6 +36,7 @@ class AudioBase {
 
 	public var attack	(get, set):Float; // seconds
 	public var release	(get, set):Float; // seconds
+	public var duration	(get, set):Float; // total time including attack + release phases
 	public var volume	(get, set):Float;
 
 	public var lastId		(default, null):Int;
@@ -47,9 +48,12 @@ class AudioBase {
 	public var timedEvent	(default, null):Signal<Int->Float->Void>;
 
 	var ID:Int = 0;
+	
 	var _attack:Float;
 	var _release:Float;
 	var _volume:Float;
+	var _duration:Float;
+	
 	var lastTime:Float = .0;
 
 	var delayedBegin:Array<TimedEvent>;
@@ -88,10 +92,11 @@ class AudioBase {
 		timedEvent = new Signal<Int->Float->Void>();
 		
 		// set some reasonable defaults
-		attack 	= 0.0;
-		release = 1.0;
-		volume 	= .2;
-
+		attack 	= .25;
+		release = .5;
+		volume 	= .25;
+		duration = Math.NaN;
+		
 		#if debug
 		itemBegin.connect(function(id, time) {
 			trace('itemBegin | id:$id, time:$time');
@@ -130,24 +135,25 @@ class AudioBase {
 	/**
 	 *
 	 * @param	id - item id
-	 * @param	atTime - the context time to release at. Don't pass anything and release begins immediately.
+	 * @param	atTime - the context time to release at. Don't pass anything and release phase begins immediately.
 	 */
 	public function doRelease(id:Int, atTime:Float=-1) {
 		var data = getItemData(id);
 		if (data == null) return;
-
-		var time;
-		var nowTime = now;
-
-		if (atTime <= nowTime) time = nowTime + sampleTime;
-		else time = atTime;
 		
-		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.linearRampToValueAtTime(0, time + release);
-		data.env.gain.setValueAtTime(0, time + release);
+		var releaseBegin = (atTime <= now) ? now : atTime;
+		var releaseEnd = releaseBegin + data.release;
 		
-		delayedRelease.push( { id:id, time:time } );
-		delayedEnd.push( { id:id, time:time + release } );
+		var attackPhase = (releaseBegin - data.triggerTime) / data.attack;
+		if (attackPhase > 1) attackPhase = 1;
+		
+		data.env.gain.cancelScheduledValues(releaseBegin);
+		data.env.gain.setValueAtTime(data.volume * attackPhase, releaseBegin);
+		data.env.gain.linearRampToValueAtTime(0, releaseEnd);
+		data.env.gain.setValueAtTime(0, releaseEnd);
+		
+		delayedRelease.push( { id:id, time:releaseBegin } );
+		delayedEnd.push( { id:id, time:releaseEnd } );
 	}
 
 
@@ -241,6 +247,11 @@ class AudioBase {
 		return _release = value;
 	}
 
+	inline function get_duration():Float return _duration;
+	function set_duration(value:Float):Float {
+		return _duration = value;
+	}
+	
 	inline function get_volume():Float return _volume;
 	function set_volume(value:Float):Float {
 		if (value < 0) value = 0;
@@ -331,27 +342,27 @@ class AudioBase {
 	}
 	
 	
-	function createAttackEnvelope(triggerTime:Float, releaseTime:Float):GainNode {
+	function createAttackEnvelope(triggerTime:Float):GainNode {
 		
 		var envelope = context.createGain();
 		
 		envelope.gain.value = 0;
 		envelope.gain.setValueAtTime(0, triggerTime); // start at zero
-		envelope.gain.linearRampToValueAtTime(volume, releaseTime); // ramp up to volume during attack
-		envelope.gain.setValueAtTime(volume, releaseTime); // set at volume after ramp
+		envelope.gain.linearRampToValueAtTime(volume, triggerTime + attack); // ramp up to volume during attack
+		//envelope.gain.setValueAtTime(volume, triggerTime + attack); // set at volume after ramp
 		envelope.connect(destination);
 		
 		return envelope;
 	}
 	
 	
-	inline function setActiveItem(id:Int, src:ItemSrcNode, envelope:GainNode, delayBy:Float, triggerTime:Float, releaseTime:Float, autoRelease:Bool):Void {
+	inline function setActiveItem(id:Int, src:ItemSrcNode, envelope:GainNode, delayBy:Float, triggerTime:Float, autoRelease:Bool):Void {
 		
-		activeItems.set(id, { id:id, src:src, volume:volume, env:envelope, attack:attack, release:release, triggerTime:triggerTime } );
+		activeItems.set(id, { id:id, src:src, volume:volume, env:envelope, attack:attack, release:release, duration:duration, triggerTime:triggerTime } );
 		
-		if (delayBy < sampleTime && !autoRelease) triggerItemBegin(id, triggerTime);
-		else delayedBegin.push({id:id, time:triggerTime});
+		if (autoRelease && (delayBy <= sampleTime)) triggerItemBegin(id, triggerTime);
+		else delayedBegin.push( { id:id, time:triggerTime } );
 		
-		if (autoRelease) doRelease(id, releaseTime + sampleTime);
+		if(autoRelease) doRelease(id, triggerTime + duration - release);
 	}
 }

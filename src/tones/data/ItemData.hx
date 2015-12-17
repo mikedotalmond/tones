@@ -20,4 +20,5 @@ typedef ItemData = {
 	var attack:Float;
 	var release:Float;
 	var volume:Float;
+	var duration:Float;
 }

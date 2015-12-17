@@ -42,18 +42,18 @@ class Tones extends AudioBase {
 	 * @param	freq		- A frequency, expressed in Hertz, and above zero. Typically in the audible range 20Hz-20KHz
 	 * @param	delayBy		- A time, in seconds, to delay triggering this tone by.
 	 * @param	autoRelease - Release as soon as attack phase ends - default behaviour (true)
-	 * 						  when false the tone will play until doRelease(toneId) is called
-	 * 						- Don't use these behaviours at the same time in one Tones instance
+	 * @param	hold	 	- Optional, and only used if autoRelease==true- duration after attack-phase to hold for before entering release-phase.
+	 * 
 	 * @return 	toneId		- The ID assigned to the tone being played. Use for doRelease() when using autoRelease=false
 	 */
-    public function playFrequency(freq:Float, delayBy:Float = .0, autoRelease:Bool = true):Int {
+    public function playFrequency(freq:Float, delayBy:Float = .0, autoRelease:Bool = true, hold:Float = .0):Int {
 
-		if (delayBy < 0) delayBy = 0;
+		if (delayBy < sampleTime) delayBy = sampleTime;
+		if (hold < sampleTime) hold = sampleTime;
 		
 		var id = nextID();
 		var triggerTime = now + delayBy;
-		var releaseTime = triggerTime + attack;
-		var envelope = createAttackEnvelope(triggerTime, releaseTime);
+		var envelope = createAttackEnvelope(triggerTime);
 		
 		//
 		var osc = context.createOscillator();
@@ -62,9 +62,12 @@ class Tones extends AudioBase {
 		
 		osc.frequency.value = freq;
 		osc.connect(envelope);
-		osc.start(triggerTime + sampleTime);
+		osc.start(triggerTime);
 		
-		setActiveItem(id, osc, envelope, delayBy, triggerTime, releaseTime, autoRelease);
+		if (autoRelease) duration = attack + hold + release;
+		else duration = Math.NaN;
+		
+		setActiveItem(id, osc, envelope, delayBy, triggerTime, autoRelease);
 		
 		return id;
 	}

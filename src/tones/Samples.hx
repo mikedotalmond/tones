@@ -23,7 +23,6 @@ class Samples extends AudioBase {
 	public var buffer(get, set):AudioBuffer;
 	public var playbackRate:Float;
 	public var offset:Float;
-	public var duration:Float;
 
 	var _buffer:AudioBuffer = null;
 	inline function get_buffer() return _buffer;
@@ -42,43 +41,47 @@ class Samples extends AudioBase {
 		super(audioContext, destinationNode);
 		playbackRate = 1.0;
 		offset = 0;
-		duration = 0;
 	}
-
+	
 
 	/**
 	 * Play a sample
+	 * sample.playSample(); // play the currently set buffer 
 	 * sample.playSample(myBuffer); // play the myBuffer sample
 	 * sample.playSample(myBuffer, 1); // play the myBuffer sample, in one second
 	 * sample.playSample(myBuffer, 1, false); // play the myBuffer sample, in one second, and doesn't release untill you call doRelease(toneId)
 	 *
-	 * @param	buffer		- The AudioBuffer to play from
+	 * @param	newBuffer	- The AudioBuffer to play from (optional if you've already set the .buffer value before calling playSample)
 	 * @param	delayBy		- A time, in seconds, to delay triggering this sample by.
 	 * @param	autoRelease - Release as soon as attack phase ends - default behaviour (true)
 	 * 						  when false the sample will play until doRelease(sampleId) is called
 	 * 						- Don't use these behaviours at the same time in one Samples instance
 	 * @return 	id			- The ID assigned to the tone being played. Use for doRelease() when using autoRelease=false
 	 */
-    public function playSample(buffer:AudioBuffer, delayBy:Float = .0, autoRelease:Bool = true):Int {
+    public function playSample(newBuffer:AudioBuffer = null, delayBy:Float = .0):Int {
 
-		if (buffer != null) this.buffer = buffer;
+		if (newBuffer != null) buffer = newBuffer;
+		if (buffer == null) throw 'The source AudioBuffer is null.';
+		
 		if (delayBy < 0) delayBy = 0;
 		
 		var id = nextID();
-		var triggerTime = now + delayBy;
-		var releaseTime = triggerTime + attack;
-		var envelope = createAttackEnvelope(triggerTime, releaseTime);
 		
-		//
+		var triggerTime = now + delayBy;
+		var envelope = createAttackEnvelope(triggerTime);
+		
 		//
 		var src = context.createBufferSource();
 		src.buffer = this.buffer;
 		src.playbackRate.value = playbackRate;
+		
+		if (offset < 0) offset = 0;
+		if (duration <= sampleTime || offset + duration > buffer.duration) duration = buffer.duration - offset;
+		
 		src.connect(envelope);
-		if (duration <= 0) duration = buffer.duration;
 		src.start(triggerTime, offset, duration);
 		
-		setActiveItem(id, src, envelope, delayBy, triggerTime, releaseTime, autoRelease);
+		setActiveItem(id, src, envelope, delayBy, triggerTime, true);
 		
 		return id;
 	}

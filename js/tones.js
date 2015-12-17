@@ -129,6 +129,9 @@ Main.main = function() {
 Math.__name__ = true;
 var Reflect = function() { };
 Reflect.__name__ = true;
+Reflect.isFunction = function(f) {
+	return typeof(f) == "function" && !(f.__name__ || f.__ename__);
+};
 Reflect.compare = function(a,b) {
 	return a == b?0:a > b?1:-1;
 };
@@ -261,9 +264,6 @@ haxe_Timer.delay = function(f,time_ms) {
 		f();
 	};
 	return t;
-};
-haxe_Timer.stamp = function() {
-	return new Date().getTime() / 1000;
 };
 haxe_Timer.prototype = {
 	stop: function() {
@@ -825,10 +825,11 @@ var tones_AudioBase = function(audioContext,destinationNode) {
 	this.itemBegin = new hxsignal_impl_Signal2();
 	this.itemEnd = new hxsignal_impl_Signal1();
 	this.timedEvent = new hxsignal_impl_Signal2();
-	this.set_attack(0.0);
-	this.set_release(1.0);
-	this.set_volume(.2);
-	tones_utils_TimeUtil.get_frameTick().connect($bind(this,this.tick));
+	this.set_attack(.25);
+	this.set_release(.5);
+	this.set_volume(.25);
+	this.set_duration(NaN);
+	tones_utils_TimeUtil._frameTick.connect($bind(this,this.tick));
 };
 tones_AudioBase.__name__ = true;
 tones_AudioBase.createContext = function() {
@@ -842,14 +843,16 @@ tones_AudioBase.prototype = {
 		if(atTime == null) atTime = -1;
 		var data = this.activeItems.h[id];
 		if(data == null) return;
-		var time;
-		var nowTime = this.context.currentTime;
-		if(atTime <= nowTime) time = nowTime + this.sampleTime; else time = atTime;
-		data.env.gain.cancelScheduledValues(time);
-		data.env.gain.linearRampToValueAtTime(0,time + this._release);
-		data.env.gain.setValueAtTime(0,time + this._release);
-		this.delayedRelease.push({ id : id, time : time});
-		this.delayedEnd.push({ id : id, time : time + this._release});
+		var releaseBegin = atTime <= this.context.currentTime?this.context.currentTime:atTime;
+		var releaseEnd = releaseBegin + data.release;
+		var attackPhase = (releaseBegin - data.triggerTime) / data.attack;
+		if(attackPhase > 1) attackPhase = 1;
+		data.env.gain.cancelScheduledValues(releaseBegin);
+		data.env.gain.setValueAtTime(data.volume * attackPhase,releaseBegin);
+		data.env.gain.linearRampToValueAtTime(0,releaseEnd);
+		data.env.gain.setValueAtTime(0,releaseEnd);
+		this.delayedRelease.push({ id : id, time : releaseBegin});
+		this.delayedEnd.push({ id : id, time : releaseEnd});
 	}
 	,releaseAll: function(atTime) {
 		if(atTime == null) atTime = -1;
@@ -876,6 +879,9 @@ tones_AudioBase.prototype = {
 	,set_release: function(value) {
 		if(value < this.sampleTime) value = this.sampleTime;
 		return this._release = value;
+	}
+	,set_duration: function(value) {
+		return this._duration = value;
 	}
 	,set_volume: function(value) {
 		if(value < 0) value = 0;
@@ -935,6 +941,14 @@ tones_AudioBase.prototype = {
 			} else j1++;
 		}
 	}
+	,createAttackEnvelope: function(triggerTime) {
+		var envelope = this.context.createGain();
+		envelope.gain.value = 0;
+		envelope.gain.setValueAtTime(0,triggerTime);
+		envelope.gain.linearRampToValueAtTime(this._volume,triggerTime + this._attack);
+		envelope.connect(this.destination);
+		return envelope;
+	}
 	,__class__: tones_AudioBase
 };
 var tones_Samples = function(audioContext,destinationNode) {
@@ -942,18 +956,41 @@ var tones_Samples = function(audioContext,destinationNode) {
 	tones_AudioBase.call(this,audioContext,destinationNode);
 	this.playbackRate = 1.0;
 	this.offset = 0;
-	this.duration = 0;
 };
 tones_Samples.__name__ = true;
+tones_Samples.loadArrayBuffer = function(url,onLoad,onProgress,onError) {
+	var request = new XMLHttpRequest();
+	request.open("GET",url,true);
+	request.responseType = "arraybuffer";
+	request.onerror = onError;
+	request.onload = function(_) {
+		onLoad(_.currentTarget.response);
+	};
+	if(onProgress != null) request.onprogress = function(_1) {
+		var percent = NaN;
+		if(_1.lengthComputable) percent = _1.loaded / _1.total;
+		onProgress(percent);
+	};
+	request.send();
+};
+tones_Samples.decodeArrayBuffer = function(buffer,context,onDecoded,onError) {
+	try {
+		context.decodeAudioData(buffer,onDecoded);
+	} catch( err ) {
+		if (err instanceof js__$Boot_HaxeError) err = err.val;
+		if( js_Boot.__instanceof(err,Error) ) {
+			if(onError != null) onError(err); else throw err;
+		} else throw(err);
+	}
+};
 tones_Samples.__super__ = tones_AudioBase;
 tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
 	set_buffer: function(value) {
 		this.offset = 0;
-		this.duration = value.duration;
+		this.set_duration(value.duration);
 		return this._buffer = value;
 	}
-	,playSample: function(buffer,delayBy,autoRelease) {
-		if(autoRelease == null) autoRelease = true;
+	,playSample: function(buffer,delayBy) {
 		if(delayBy == null) delayBy = .0;
 		if(buffer != null) this.set_buffer(buffer);
 		if(delayBy < 0) delayBy = 0;
@@ -963,22 +1000,17 @@ tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
 		tmp = this.lastId;
 		var id = tmp;
 		var triggerTime = this.context.currentTime + delayBy;
-		var releaseTime = triggerTime + this._attack;
-		var envelope = this.context.createGain();
-		envelope.gain.value = 0;
-		envelope.gain.setValueAtTime(0,triggerTime);
-		envelope.gain.linearRampToValueAtTime(this._volume,releaseTime);
-		envelope.gain.setValueAtTime(this._volume,releaseTime);
-		envelope.connect(this.destination);
+		var envelope = this.createAttackEnvelope(triggerTime);
 		var src = this.context.createBufferSource();
 		src.buffer = this._buffer;
 		src.playbackRate.value = this.playbackRate;
+		if(this.offset < 0) this.offset = 0;
+		if(this._duration <= this.sampleTime || this.offset + this._duration > buffer.duration) this.set_duration(buffer.duration - this.offset);
 		src.connect(envelope);
-		if(this.duration <= 0) this.duration = buffer.duration;
-		src.start(triggerTime,this.offset,this.duration);
-		this.activeItems.h[id] = { id : id, src : src, volume : this._volume, env : envelope, attack : this._attack, release : this._release, triggerTime : triggerTime};
-		if(delayBy < this.sampleTime) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
-		if(autoRelease) this.doRelease(id,releaseTime + this.sampleTime);
+		src.start(triggerTime,this.offset,this._duration);
+		this.activeItems.h[id] = { id : id, src : src, volume : this._volume, env : envelope, attack : this._attack, release : this._release, duration : this._duration, triggerTime : triggerTime};
+		if(delayBy <= this.sampleTime) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
+		this.doRelease(id,triggerTime + this._duration - this._release);
 		return id;
 	}
 	,__class__: tones_Samples
@@ -991,31 +1023,28 @@ var tones_Tones = function(audioContext,destinationNode) {
 tones_Tones.__name__ = true;
 tones_Tones.__super__ = tones_AudioBase;
 tones_Tones.prototype = $extend(tones_AudioBase.prototype,{
-	playFrequency: function(freq,delayBy,autoRelease) {
+	playFrequency: function(freq,delayBy,autoRelease,hold) {
+		if(hold == null) hold = .0;
 		if(autoRelease == null) autoRelease = true;
 		if(delayBy == null) delayBy = .0;
-		if(delayBy < 0) delayBy = 0;
+		if(delayBy < this.sampleTime) delayBy = this.sampleTime;
+		if(hold < this.sampleTime) hold = this.sampleTime;
 		var tmp;
 		this.lastId = this.ID;
 		this.ID++;
 		tmp = this.lastId;
 		var id = tmp;
 		var triggerTime = this.context.currentTime + delayBy;
-		var releaseTime = triggerTime + this._attack;
-		var envelope = this.context.createGain();
-		envelope.gain.value = 0;
-		envelope.gain.setValueAtTime(0,triggerTime);
-		envelope.gain.linearRampToValueAtTime(this._volume,releaseTime);
-		envelope.gain.setValueAtTime(this._volume,releaseTime);
-		envelope.connect(this.destination);
+		var envelope = this.createAttackEnvelope(triggerTime);
 		var osc = this.context.createOscillator();
 		if(this.type == window.OscillatorTypeShim.CUSTOM) osc.setPeriodicWave(this.customWave); else osc.type = this.type;
 		osc.frequency.value = freq;
 		osc.connect(envelope);
-		osc.start(triggerTime + this.sampleTime);
-		this.activeItems.h[id] = { id : id, src : osc, env : envelope, volume : this._volume, attack : this._attack, release : this._release, triggerTime : triggerTime};
-		if(delayBy < this.sampleTime) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
-		if(autoRelease) this.doRelease(id,releaseTime + this.sampleTime);
+		osc.start(triggerTime);
+		if(autoRelease) this.set_duration(this._attack + hold + this._release); else this.set_duration(NaN);
+		this.activeItems.h[id] = { id : id, src : osc, volume : this._volume, env : envelope, attack : this._attack, release : this._release, duration : this._duration, triggerTime : triggerTime};
+		if(autoRelease && delayBy <= this.sampleTime) this.triggerItemBegin(id,triggerTime); else this.delayedBegin.push({ id : id, time : triggerTime});
+		if(autoRelease) this.doRelease(id,triggerTime + this._duration - this._release);
 		return id;
 	}
 	,__class__: tones_Tones
@@ -1025,10 +1054,12 @@ tones_data_OscillatorTypeShim.__name__ = true;
 var tones_examples_Basic = function() {
 	this.tones = new tones_Tones();
 	this.tones.playFrequency(440);
-	this.tones.set_volume(.05);
-	this.tones.set_attack(.500);
+	this.tones.set_volume(.15);
+	this.tones.set_attack(.5);
+	this.tones.set_release(.50);
+	this.tones.type = window.OscillatorTypeShim.SAWTOOTH;
 	var freqUtil = new tones_utils_NoteFrequencyUtil();
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("G3"),1);
+	this.tones.playFrequency(freqUtil.noteNameToFrequency("G1"),1,true,2);
 };
 tones_examples_Basic.__name__ = true;
 tones_examples_Basic.prototype = {
@@ -1054,7 +1085,7 @@ var tones_examples_CustomWaves = function() {
 	});
 	this.tones = new tones_Tones();
 	this.tones.set_volume(.15);
-	this.tones.set_attack(.010);
+	this.tones.set_attack(.050);
 	this.tones.set_release(.500);
 	this.tones.type = window.OscillatorTypeShim.CUSTOM;
 	this.wavetables = new tones_utils_Wavetables();
@@ -1090,10 +1121,10 @@ tones_examples_CustomWaves.prototype = {
 			break;
 		case "mousemove":
 			if(this.mouseIsDown) {
-				var now = haxe_Timer.stamp();
+				var now = this.tones.context.currentTime;
 				var dt = now - this.lastTime;
 				if(dt > .05) {
-					this.lastTime = now;
+					this.lastTime = this.tones.context.currentTime;
 					this.tones.set_volume(e.clientY / window.innerHeight * .2);
 					var f = 50 + 750 * (e.clientX / window.innerWidth);
 					f = f < 20?20:f;
@@ -1512,17 +1543,17 @@ tones_examples_RandomSequence.prototype = {
 var tones_examples_ReleaseLater = function() {
 	var tones2 = new tones_Tones();
 	tones2.type = window.OscillatorTypeShim.SQUARE;
-	tones2.set_volume(.05);
-	tones2.set_attack(.200);
-	tones2.set_release(2.5);
-	var noteId1 = tones2.playFrequency(220,.1,false);
+	tones2.set_volume(.02);
+	tones2.set_attack(.5);
+	tones2.set_release(1.5);
+	var noteId1 = tones2.playFrequency(220,0,false);
 	tones2.set_volume(.03);
 	tones2.type = window.OscillatorTypeShim.SAWTOOTH;
-	var noteId2 = tones2.playFrequency(111,.1001,false);
+	var noteId2 = tones2.playFrequency(111,1,false);
 	haxe_Timer.delay(function() {
 		tones2.doRelease(noteId1);
 		tones2.doRelease(noteId2);
-	},2250);
+	},2000);
 };
 tones_examples_ReleaseLater.__name__ = true;
 tones_examples_ReleaseLater.prototype = {
@@ -1541,13 +1572,9 @@ var tones_examples_SamplesBasic = function() {
 	this.tones.set_volume(.2);
 	this.samples = new tones_Samples(this.ctx,this.outGain);
 	this.samples.itemBegin.connect($bind(this,this.onSampleBegin));
-	var request = new XMLHttpRequest();
-	request.open("GET","data/samples/kick.wav",true);
-	request.responseType = "arraybuffer";
-	request.onload = function(_) {
-		_g.samples.context.decodeAudioData(_.currentTarget.response,$bind(_g,_g.sampleDecoded));
-	};
-	request.send();
+	tones_Samples.loadArrayBuffer("data/samples/kick.wav",function(buffer) {
+		tones_Samples.decodeArrayBuffer(buffer,_g.ctx,$bind(_g,_g.sampleDecoded));
+	});
 };
 tones_examples_SamplesBasic.__name__ = true;
 tones_examples_SamplesBasic.prototype = {
@@ -2015,9 +2042,6 @@ tones_utils_NoteFrequencyUtil.prototype = {
 };
 var tones_utils_TimeUtil = function() { };
 tones_utils_TimeUtil.__name__ = true;
-tones_utils_TimeUtil.get_frameTick = function() {
-	return tones_utils_TimeUtil._frameTick;
-};
 tones_utils_TimeUtil.onFrame = function(_) {
 	tones_utils_TimeUtil._frameTick.emit(_);
 	window.requestAnimationFrame(tones_utils_TimeUtil.onFrame);
@@ -2085,6 +2109,23 @@ var Bool = Boolean;
 Bool.__ename__ = ["Bool"];
 var Class = { __name__ : ["Class"]};
 var Enum = { };
+tones_Samples.audioTester = (function($this) {
+	var $r;
+	try {
+		$r = (function($this) {
+			var $r;
+			var _this = window.document;
+			$r = _this.createElement("audio");
+			return $r;
+		}($this));
+	} catch( err ) {
+		if (err instanceof js__$Boot_HaxeError) err = err.val;
+		if( js_Boot.__instanceof(err,Error) ) {
+			$r = null;
+		} else throw(err);
+	}
+	return $r;
+}(this));
 var node = window.OscillatorNode;
 if(node != null) {
 	if(Object.prototype.hasOwnProperty.call(node,"SINE")) {
@@ -2095,8 +2136,20 @@ if(node != null) {
 }
 tones_utils_TimeUtil._frameTick = new hxsignal_impl_Signal1();
 window.requestAnimationFrame(tones_utils_TimeUtil.onFrame);
+if((function($this) {
+	var $r;
+	var o = window;
+	$r = Object.prototype.hasOwnProperty.call(o,"performance");
+	return $r;
+}(this)) && Reflect.isFunction(($_=window.performance,$bind($_,$_.now)))) tones_utils_TimeUtil.nowTime = ($_=window.performance,$bind($_,$_.now)); else {
+	tones_utils_TimeUtil.initTime = new Date().getTime();
+	tones_utils_TimeUtil.nowTime = function() {
+		return new Date().getTime() - tones_utils_TimeUtil.initTime;
+	};
+}
 haxe_ds_ObjectMap.count = 0;
 js_Boot.__toStr = {}.toString;
+tones_utils_TimeUtil.initTime = 0;
 tones_utils_Wavetables.FileNames = ["Bass.json","Bass_Amp360.json","Bass_Fuzz.json","Bass_Fuzz_2.json","Bass_Sub_Dub.json","Bass_Sub_Dub_2.json","Brass.json","Brit_Blues.json","Brit_Blues_Driven.json","Buzzy_1.json","Buzzy_2.json","Celeste.json","Chorus_Strings.json","Dissonant_1.json","Dissonant_2.json","Dissonant_Piano.json","Dropped_Saw.json","Dropped_Square.json","Dyna_EP_Bright.json","Dyna_EP_Med.json","Ethnic_33.json","Full_1.json","Full_2.json","Guitar_Fuzz.json","Harsh.json","Mkl_Hard.json","Noise.json","Organ_2.json","Organ_3.json","Phoneme_ah.json","Phoneme_bah.json","Phoneme_ee.json","Phoneme_o.json","Phoneme_ooh.json","Phoneme_pop_ahhhs.json","Piano.json","Putney_Wavering.json","TB303_Square.json","Throaty.json","Trombone.json","TwelveStringGuitar.json","Twelve_OpTines.json","Warm_Saw.json","Warm_Square.json","Warm_Triangle.json","Wurlitzer.json","Wurlitzer_2.json"];
 Main.main();
 })(typeof console != "undefined" ? console : {log:function(){}}, typeof window != "undefined" ? window : typeof global != "undefined" ? global : typeof self != "undefined" ? self : this);

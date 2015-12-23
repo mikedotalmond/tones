@@ -20,7 +20,7 @@ typedef WavetableData = {
 
 class Wavetables {
 	
-	// wavetable was data sourced from chromium.googlecode.com/svn/trunk/samples/audio/wave-tables
+	// example data sourced from chromium.googlecode.com/svn/trunk/samples/audio/wave-tables
 	public static var FileNames(default, null):Array<String> = WavetableFiles.processData('src/data/', 'bin/data/wavetables/');
 	
 #if !macro

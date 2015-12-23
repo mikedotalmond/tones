@@ -1,39 +1,33 @@
 package tones.utils;
 
-/**
- * A Haxe port of the Recorderjs interface - https://github.com/mattdiamond/Recorderjs
- * Uses/requires the recorderWorker.js script from Recorderjs
- * 
- * Utility to record the output of an AudioNode and save as WAV
- * (encode process runs asynchronously in a worker)
- */
+import hxsignal.Signal;
 
 import js.Browser;
-import hxsignal.Signal;
-import js.html.URL;
-
 import js.html.AnchorElement;
-
-import js.html.audio.AudioContext;
 import js.html.audio.AudioNode;
 import js.html.audio.ScriptProcessorNode;
-
 import js.html.Blob;
 import js.html.Document;
-import js.html.DOMURL;
 import js.html.Float32Array;
 import js.html.MessageEvent;
+import js.html.URL;
 import js.html.Worker;
 
- 
+/**
+ * A port of the Recorderjs interface - https://github.com/mattdiamond/Recorderjs
+ * Uses/requires the recorderWorker.js worker script from Recorderjs
+ * 
+ * A utility to record the output of an AudioNode and save as WAVE
+ */
+
 class AudioNodeRecorder {
 	
-	public var recording		(default, null):Bool;
-	public var wavEncoded		(default, null):Signal<Blob->Void>;
-	public var bufferExported	(default, null):Signal<Array<Float32Array>->Void>;
+	public var recording(default, null):Bool;
+	public var wavEncoded(default, null):Signal<Blob->Void>;
+	public var bufferExported(default, null):Signal<Array<Float32Array>->Void>;
 
-	var worker	:Worker;
-	var node	:ScriptProcessorNode;
+	var worker:Worker;
+	var node:ScriptProcessorNode;
 	
 	public function new(source:AudioNode, bufferSize:Int=4096, workerPath:String='js/recorderWorker.js') {
 		
@@ -45,11 +39,7 @@ class AudioNodeRecorder {
 		wavEncoded 		= new Signal<Blob->Void>();
 		bufferExported 	= new Signal<Array<Float32Array>->Void>();
 		
-		worker.postMessage({
-		  command: 'init',
-		  config: { sampleRate: context.sampleRate }
-		});
-		
+		worker.postMessage({ command: 'init', config: { sampleRate: context.sampleRate } });
 		worker.onmessage = onWorkerMessage;
 		node.onaudioprocess = onAudioProcess;
 		
@@ -68,12 +58,11 @@ class AudioNodeRecorder {
 		}
     }
 	
+	
 	function onAudioProcess(e) {
 		if (!recording) return;
-		
 		RecordBufferMessage.buffer[0] = e.inputBuffer.getChannelData(0);
 		RecordBufferMessage.buffer[1] = e.inputBuffer.getChannelData(1);
-		
 		worker.postMessage(RecordBufferMessage);
 	}
 	
@@ -84,7 +73,6 @@ class AudioNodeRecorder {
 	inline public function clear() worker.postMessage( ClearBufferMessage );
 	inline public function getBuffer() worker.postMessage( GetBufferMessage );
 	inline public function encodeWAV() worker.postMessage( EncodeWAVMessage );
-	
 	
 	public static function forceDownload(blob:Blob, filename:String = 'output.wav') {
 		
@@ -99,13 +87,12 @@ class AudioNodeRecorder {
 		link.dispatchEvent(click);
 	}
 	
-	static var RecordBufferMessage	:BufferMessage = { command: 'record', buffer:[] };
-	static var GetBufferMessage		:BufferMessage = { command: 'getBuffer' };
-	static var EncodeWAVMessage		:BufferMessage = { command: 'exportWAV', type: 'audio/wav' };
-	static var ClearBufferMessage	:BufferMessage = { command: 'clear' };
+	static var RecordBufferMessage:BufferMessage = { command: 'record', buffer:[] };
+	static var GetBufferMessage:BufferMessage = { command: 'getBuffer' };
+	static var EncodeWAVMessage:BufferMessage = { command: 'exportWAV', type: 'audio/wav' };
+	static var ClearBufferMessage:BufferMessage = { command: 'clear' };
 }
-
-
+ 
 typedef BufferMessage = {
 	var command:String;
 	@:optional var type:String;

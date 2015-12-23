@@ -990,9 +990,10 @@ tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
 		this.set_duration(value.duration);
 		return this._buffer = value;
 	}
-	,playSample: function(buffer,delayBy) {
+	,playSample: function(newBuffer,delayBy) {
 		if(delayBy == null) delayBy = .0;
-		if(buffer != null) this.set_buffer(buffer);
+		if(newBuffer != null) this.set_buffer(newBuffer);
+		if(this._buffer == null) throw new js__$Boot_HaxeError("The source AudioBuffer is null.");
 		if(delayBy < 0) delayBy = 0;
 		var tmp;
 		this.lastId = this.ID;
@@ -1005,7 +1006,7 @@ tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
 		src.buffer = this._buffer;
 		src.playbackRate.value = this.playbackRate;
 		if(this.offset < 0) this.offset = 0;
-		if(this._duration <= this.sampleTime || this.offset + this._duration > buffer.duration) this.set_duration(buffer.duration - this.offset);
+		if(this._duration <= this.sampleTime || this.offset + this._duration > this._buffer.duration) this.set_duration(this._buffer.duration - this.offset);
 		src.connect(envelope);
 		src.start(triggerTime,this.offset,this._duration);
 		this.activeItems.h[id] = { id : id, src : src, volume : this._volume, env : envelope, attack : this._attack, release : this._release, duration : this._duration, triggerTime : triggerTime};
@@ -1018,7 +1019,7 @@ tones_Samples.prototype = $extend(tones_AudioBase.prototype,{
 var tones_Tones = function(audioContext,destinationNode) {
 	this.customWave = null;
 	tones_AudioBase.call(this,audioContext,destinationNode);
-	this.type = window.OscillatorTypeShim.SINE;
+	this.type = window.TonesOscillatorTypeShim.SINE;
 };
 tones_Tones.__name__ = true;
 tones_Tones.__super__ = tones_AudioBase;
@@ -1037,7 +1038,7 @@ tones_Tones.prototype = $extend(tones_AudioBase.prototype,{
 		var triggerTime = this.context.currentTime + delayBy;
 		var envelope = this.createAttackEnvelope(triggerTime);
 		var osc = this.context.createOscillator();
-		if(this.type == window.OscillatorTypeShim.CUSTOM) osc.setPeriodicWave(this.customWave); else osc.type = this.type;
+		if(this.type == window.TonesOscillatorTypeShim.CUSTOM) osc.setPeriodicWave(this.customWave); else osc.type = this.type;
 		osc.frequency.value = freq;
 		osc.connect(envelope);
 		osc.start(triggerTime);
@@ -1057,9 +1058,9 @@ var tones_examples_Basic = function() {
 	this.tones.set_volume(.15);
 	this.tones.set_attack(.5);
 	this.tones.set_release(.50);
-	this.tones.type = window.OscillatorTypeShim.SAWTOOTH;
+	this.tones.type = window.TonesOscillatorTypeShim.SAWTOOTH;
 	var freqUtil = new tones_utils_NoteFrequencyUtil();
-	this.tones.playFrequency(freqUtil.noteNameToFrequency("G1"),1,true,2);
+	this.tones.playFrequency(freqUtil.noteNameToFrequency("G1"),1,true,1);
 };
 tones_examples_Basic.__name__ = true;
 tones_examples_Basic.prototype = {
@@ -1087,7 +1088,7 @@ var tones_examples_CustomWaves = function() {
 	this.tones.set_volume(.15);
 	this.tones.set_attack(.050);
 	this.tones.set_release(.500);
-	this.tones.type = window.OscillatorTypeShim.CUSTOM;
+	this.tones.type = window.TonesOscillatorTypeShim.CUSTOM;
 	this.wavetables = new tones_utils_Wavetables();
 	this.wavetables.loadComplete.connect($bind(this,this.wavetablesLoaded),hxsignal_ConnectionTimes.Once);
 };
@@ -1141,7 +1142,7 @@ var tones_examples_FreqSlide = function() {
 	this.tones = new tones_Tones();
 	this.tones.itemBegin.connect($bind(this,this.onToneStart));
 	this.tones.itemRelease.connect($bind(this,this.onToneReleased));
-	this.tones.type = window.OscillatorTypeShim.SQUARE;
+	this.tones.type = window.TonesOscillatorTypeShim.SQUARE;
 	this.tones.set_volume(.04);
 	this.tones.set_attack(.200);
 	this.tones.set_release(.400);
@@ -1172,12 +1173,12 @@ var tones_examples_KeyboardControlled = function() {
 	this.outGain = this.context.createGain();
 	this.outGain.gain.value = .2;
 	this.tonesA = new tones_Tones(this.context,this.outGain);
-	this.tonesA.type = window.OscillatorTypeShim.SQUARE;
+	this.tonesA.type = window.TonesOscillatorTypeShim.SQUARE;
 	this.tonesA.set_volume(.62);
 	this.tonesA.set_attack(0);
 	this.tonesA.set_release(2);
 	this.tonesB = new tones_Tones(this.context,this.outGain);
-	this.tonesB.type = window.OscillatorTypeShim.SQUARE;
+	this.tonesB.type = window.TonesOscillatorTypeShim.SQUARE;
 	this.tonesB.set_volume(.48);
 	this.tonesB.set_attack(2);
 	this.tonesB.set_release(.133);
@@ -1348,20 +1349,20 @@ tones_examples_KeyboardControlled.prototype = {
 	,onWaveformSelect: function(value,target) {
 		switch(value) {
 		case "Sine":
-			target.type = window.OscillatorTypeShim.SINE;
+			target.type = window.TonesOscillatorTypeShim.SINE;
 			break;
 		case "Square":
-			target.type = window.OscillatorTypeShim.SQUARE;
+			target.type = window.TonesOscillatorTypeShim.SQUARE;
 			break;
 		case "Sawtooth":
-			target.type = window.OscillatorTypeShim.SAWTOOTH;
+			target.type = window.TonesOscillatorTypeShim.SAWTOOTH;
 			break;
 		case "Triangle":
-			target.type = window.OscillatorTypeShim.TRIANGLE;
+			target.type = window.TonesOscillatorTypeShim.TRIANGLE;
 			break;
 		default:
 			var data = this.getWavetableDataByName(value);
-			target.type = window.OscillatorTypeShim.CUSTOM;
+			target.type = window.TonesOscillatorTypeShim.CUSTOM;
 			target.customWave = this.context.createPeriodicWave(data.real,data.imag);
 		}
 		console.log("Oscillator set to " + value);
@@ -1436,7 +1437,7 @@ var tones_examples_LorenzTones = function() {
 	this.masterGain.connect(c.destination);
 	this.tones = new tones_Tones(c,this.masterGain);
 	this.tones.itemBegin.connect($bind(this,this.onToneStart));
-	this.tones.type = window.OscillatorTypeShim.TRIANGLE;
+	this.tones.type = window.TonesOscillatorTypeShim.TRIANGLE;
 	this.tones.set_volume(.2);
 	this.tones.set_attack(.250);
 	this.tones.playFrequency(40,.5,false);
@@ -1518,7 +1519,7 @@ tones_examples_Lorenz.prototype = {
 };
 var tones_examples_RandomSequence = function() {
 	this.tones = new tones_Tones();
-	this.tones.type = window.OscillatorTypeShim.SQUARE;
+	this.tones.type = window.TonesOscillatorTypeShim.SQUARE;
 	this.tones.itemBegin.connect($bind(this,this.onToneBegin));
 	this.tones.itemEnd.connect($bind(this,this.onToneEnd));
 	this.playRandom();
@@ -1542,13 +1543,13 @@ tones_examples_RandomSequence.prototype = {
 };
 var tones_examples_ReleaseLater = function() {
 	var tones2 = new tones_Tones();
-	tones2.type = window.OscillatorTypeShim.SQUARE;
+	tones2.type = window.TonesOscillatorTypeShim.SQUARE;
 	tones2.set_volume(.02);
 	tones2.set_attack(.5);
 	tones2.set_release(1.5);
 	var noteId1 = tones2.playFrequency(220,0,false);
 	tones2.set_volume(.03);
-	tones2.type = window.OscillatorTypeShim.SAWTOOTH;
+	tones2.type = window.TonesOscillatorTypeShim.SAWTOOTH;
 	var noteId2 = tones2.playFrequency(111,1,false);
 	haxe_Timer.delay(function() {
 		tones2.doRelease(noteId1);
@@ -1566,7 +1567,7 @@ var tones_examples_SamplesBasic = function() {
 	this.outGain.gain.value = .7;
 	this.outGain.connect(this.ctx.destination);
 	this.tones = new tones_Tones(this.ctx,this.outGain);
-	this.tones.type = window.OscillatorTypeShim.SQUARE;
+	this.tones.type = window.TonesOscillatorTypeShim.SQUARE;
 	this.tones.set_attack(0.01);
 	this.tones.set_release(.5);
 	this.tones.set_volume(.2);
@@ -1625,7 +1626,7 @@ var tones_examples_Sequence = function() {
 	this.tones.set_volume(.1);
 	this.tones.set_attack(.025);
 	this.tones.set_release(1);
-	this.tones.type = window.OscillatorTypeShim.SAWTOOTH;
+	this.tones.type = window.TonesOscillatorTypeShim.SAWTOOTH;
 	this.freqUtil = new tones_utils_NoteFrequencyUtil();
 	this.lastNoteId = -1;
 	this.tones.itemBegin.connect(function(id,time) {
@@ -1684,11 +1685,11 @@ var tones_examples_SharedContext = function() {
 	pan2.connect(masterVolume);
 	var tones1 = new tones_Tones(this.context,pan1);
 	var tones2 = new tones_Tones(this.context,pan2);
-	tones1.type = window.OscillatorTypeShim.SAWTOOTH;
+	tones1.type = window.TonesOscillatorTypeShim.SAWTOOTH;
 	tones1.set_volume(.2);
 	tones1.set_attack(.001);
 	tones1.set_release(2.500);
-	tones2.type = window.OscillatorTypeShim.SQUARE;
+	tones2.type = window.TonesOscillatorTypeShim.SQUARE;
 	tones2.set_volume(.2);
 	tones2.set_attack(.500);
 	tones2.set_release(1.500);
@@ -2129,9 +2130,9 @@ tones_Samples.audioTester = (function($this) {
 var node = window.OscillatorNode;
 if(node != null) {
 	if(Object.prototype.hasOwnProperty.call(node,"SINE")) {
-		window.OscillatorTypeShim = {SINE:node.SINE, SQUARE:node.SQUARE, TRIANGLE:node.TRIANGLE, SAWTOOTH:node.SAWTOOTH, CUSTOM:node.CUSTOM}
+		window.TonesOscillatorTypeShim = {SINE:node.SINE, SQUARE:node.SQUARE, TRIANGLE:node.TRIANGLE, SAWTOOTH:node.SAWTOOTH, CUSTOM:node.CUSTOM}
 	} else {
-		window.OscillatorTypeShim = {SINE:"sine", SQUARE:"square", TRIANGLE:"triangle", SAWTOOTH:"sawtooth", CUSTOM:"custom"}
+		window.TonesOscillatorTypeShim = {SINE:"sine", SQUARE:"square", TRIANGLE:"triangle", SAWTOOTH:"sawtooth", CUSTOM:"custom"}
 	}
 }
 tones_utils_TimeUtil._frameTick = new hxsignal_impl_Signal1();
